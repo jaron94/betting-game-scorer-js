@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   CARD_SEQUENCE,
   DEFAULT_SCORING,
+  chooseTrump,
   createGame,
   currentRound,
   pointsFor,
+  restoreGameState,
   rollback,
   roundSequenceFor,
+  settingsForPreset,
   submitBids,
   submitTricks,
   totalsFor,
@@ -25,6 +28,11 @@ describe("legacy Betting Game rules", () => {
     expect(roundSequenceFor(52)).toEqual([1]);
   });
 
+  it("supports independently configured starting and ending cards", () => {
+    expect(roundSequenceFor(4, 10, 1)).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(roundSequenceFor(4, 3, 5)).toEqual([3, 2, 1, 2, 3, 4, 5]);
+  });
+
   it("awards tricks plus ten points for matching the bid", () => {
     expect(pointsFor(3, 3)).toBe(13);
     expect(pointsFor(3, 4)).toBe(4);
@@ -33,24 +41,77 @@ describe("legacy Betting Game rules", () => {
 
   it("uses the core scoring configuration by default", () => {
     const game = createGame(["Ada", "Ben"]);
-    expect(game.scoring).toEqual(DEFAULT_SCORING);
+    expect(game.settings.scoring).toEqual(DEFAULT_SCORING);
+    expect(game.settings.preset).toBe("betting-game");
+  });
+
+  it("upgrades a legacy saved game without losing its scoring rules", () => {
+    const game = createGame(["Ada", "Ben"]);
+    const legacy = Object.fromEntries(
+      Object.entries(game).filter(([key]) => key !== "settings" && key !== "pendingTrump"),
+    );
+    const restored = restoreGameState({
+      ...legacy,
+      scoring: { mode: "difference", pointsPerUnit: 2, exactBidBonus: 5 },
+    });
+    expect(restored.settings.preset).toBe("custom");
+    expect(restored.settings.scoring).toEqual({
+      mode: "difference",
+      pointsPerUnit: 2,
+      exactBidBonus: 5,
+      missedBidScoring: "zero",
+    });
   });
 
   it("supports configurable trick points and exact-bid bonuses", () => {
-    const scoring = { mode: "tricks" as const, pointsPerUnit: 2, exactBidBonus: 5 };
+    const scoring = { mode: "tricks" as const, pointsPerUnit: 2, exactBidBonus: 5, missedBidScoring: "zero" as const };
     expect(pointsFor(3, 3, scoring)).toBe(11);
     expect(pointsFor(3, 4, scoring)).toBe(8);
   });
 
   it("supports scoring by the distance from the bid", () => {
-    const scoring = { mode: "difference" as const, pointsPerUnit: 2, exactBidBonus: 10 };
+    const scoring = { mode: "difference" as const, pointsPerUnit: 2, exactBidBonus: 10, missedBidScoring: "zero" as const };
     expect(pointsFor(3, 3, scoring)).toBe(10);
     expect(pointsFor(3, 5, scoring)).toBe(4);
     expect(pointsFor(3, 2, scoring)).toBe(-2);
   });
 
   it("scores one overtrick as one point in difference mode", () => {
-    expect(pointsFor(2, 3, { mode: "difference", pointsPerUnit: 1, exactBidBonus: 10 })).toBe(1);
+    expect(pointsFor(2, 3, { mode: "difference", pointsPerUnit: 1, exactBidBonus: 10, missedBidScoring: "zero" })).toBe(1);
+  });
+
+  it("supports zero or negative scores for a missed Oh Hell bid", () => {
+    const zeroMiss = { mode: "bid" as const, pointsPerUnit: 1, exactBidBonus: 10, missedBidScoring: "zero" as const };
+    const negativeMiss = { ...zeroMiss, missedBidScoring: "negative" as const };
+    expect(pointsFor(2, 2, zeroMiss)).toBe(12);
+    expect(pointsFor(2, 3, zeroMiss)).toBe(0);
+    expect(pointsFor(2, 3, negativeMiss)).toBe(-1);
+    expect(pointsFor(3, 1, negativeMiss)).toBe(-2);
+  });
+
+  it("applies preset trump and order-of-play rules", () => {
+    const betting = createGame(["Ada", "Ben", "Cam"]);
+    expect(currentRound(betting).bidOrder[0].name).toBe("Ada");
+    expect(currentRound(betting).leadOrder[0].name).toBe("Ben");
+    expect(currentRound(betting).trump).toBe("spades");
+
+    const ohHell = createGame(["Ada", "Ben", "Cam"], settingsForPreset("oh-hell", 3));
+    expect(currentRound(ohHell).bidOrder[0].name).toBe("Ben");
+    expect(currentRound(ohHell).leadOrder[0].name).toBe("Ben");
+    expect(currentRound(ohHell).trump).toBeNull();
+  });
+
+  it("requires manual trumps and permits exactly bid on a one-card round", () => {
+    const settings = { ...settingsForPreset("oh-hell", 2), startingCards: 1, endingCards: 1 };
+    let game = createGame(["Ada", "Ben"], settings);
+    const [ada, ben] = game.players;
+    expect(() => submitBids(game, { [ada.id]: 0, [ben.id]: 1 })).toThrow("Choose trumps");
+
+    game = chooseTrump(game, "hearts");
+    game = submitBids(game, { [ada.id]: 0, [ben.id]: 1 });
+    game = submitTricks(game, { [ada.id]: 0, [ben.id]: 1 });
+    expect(game.stage).toBe("complete");
+    expect(game.rounds[0].trump).toBe("hearts");
   });
 
   it("rejects an exactly-bid round", () => {
