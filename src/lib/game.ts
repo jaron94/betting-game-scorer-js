@@ -1,8 +1,23 @@
-export const MAX_PLAYERS = 7;
+export const DECK_SIZE = 52;
+export const MAX_CARDS_PER_PLAYER = 7;
+export const MAX_PLAYERS = DECK_SIZE;
 export const MIN_PLAYERS = 2;
 export const STARTING_RATING = 1000;
-export const CARD_SEQUENCE = [7, 6, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7] as const;
 export const TRUMP_SEQUENCE = ["spades", "hearts", "diamonds", "clubs", "none"] as const;
+
+export function roundSequenceFor(playerCount: number): number[] {
+  if (!Number.isInteger(playerCount) || playerCount < MIN_PLAYERS || playerCount > MAX_PLAYERS) {
+    throw new Error(`Choose between ${MIN_PLAYERS} and ${MAX_PLAYERS} players.`);
+  }
+
+  const highestRound = Math.min(MAX_CARDS_PER_PLAYER, Math.floor(DECK_SIZE / playerCount));
+  return [
+    ...Array.from({ length: highestRound }, (_, index) => highestRound - index),
+    ...Array.from({ length: highestRound - 1 }, (_, index) => index + 2),
+  ];
+}
+
+export const CARD_SEQUENCE = roundSequenceFor(7);
 
 export type Trump = (typeof TRUMP_SEQUENCE)[number];
 export type Stage = "bidding" | "results" | "complete";
@@ -82,10 +97,11 @@ export function validateScoring(scoring: ScoringConfig): void {
 }
 
 export function currentRound(state: GameState) {
+  const cardSequence = roundSequenceFor(state.players.length);
   const roundNumber = state.roundIndex + 1;
   return {
     roundNumber,
-    cards: CARD_SEQUENCE[state.roundIndex],
+    cards: cardSequence[state.roundIndex],
     trump: TRUMP_SEQUENCE[state.roundIndex % TRUMP_SEQUENCE.length],
     dealer: state.players[state.roundIndex % state.players.length],
     order: rotate(state.players, state.roundIndex),
@@ -169,7 +185,7 @@ export function submitTricks(state: GameState, tricks: Record<string, number>): 
     tricks,
   };
   const rounds = [...state.rounds, completedRound];
-  const complete = rounds.length === CARD_SEQUENCE.length;
+  const complete = rounds.length === roundSequenceFor(state.players.length).length;
   return {
     ...state,
     rounds,
