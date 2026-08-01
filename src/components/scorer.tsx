@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CARD_SEQUENCE,
+  DEFAULT_SCORING,
   createGame,
   currentRound,
   pointsFor,
@@ -13,6 +14,8 @@ import {
   totalsFor,
   type GameState,
   type PlayerSetup,
+  type ScoringConfig,
+  type ScoringMode,
   type Trump,
 } from "@/lib/game";
 import type { SavedRating } from "@/db/save-game";
@@ -34,7 +37,10 @@ export function Scorer() {
     let savedGame: GameState | null = null;
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) savedGame = JSON.parse(saved) as GameState;
+      if (saved) {
+        const parsed = JSON.parse(saved) as GameState;
+        savedGame = { ...parsed, scoring: parsed.scoring ?? { ...DEFAULT_SCORING } };
+      }
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -66,6 +72,7 @@ export function Scorer() {
 function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
   const [count, setCount] = useState(4);
   const [names, setNames] = useState(["", "", "", ""]);
+  const [scoring, setScoring] = useState<ScoringConfig>({ ...DEFAULT_SCORING });
   const [error, setError] = useState("");
 
   function updateCount(next: number) {
@@ -75,7 +82,7 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
 
   function start() {
     try {
-      onStart(createGame(names));
+      onStart(createGame(names, scoring));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not start the game.");
     }
@@ -98,6 +105,57 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
             <input value={name} maxLength={40} autoComplete="off" placeholder={index === 0 ? "e.g. Jonathan" : "Name"} onChange={(event) => setNames((current) => current.map((value, i) => i === index ? event.target.value : value))} />
           </label>
         ))}
+        <fieldset className="scoring-settings">
+          <legend>Scoring rules</legend>
+          <label>
+            <span>Scoring method</span>
+            <select
+              value={scoring.mode}
+              onChange={(event) => setScoring((current) => ({
+                ...current,
+                mode: event.target.value as ScoringMode,
+              }))}
+            >
+              <option value="tricks">Core — tricks won + exact bonus</option>
+              <option value="difference">Difference — penalise missed tricks</option>
+            </select>
+          </label>
+          <div className="scoring-number-grid">
+            <label>
+              <span>{scoring.mode === "tricks" ? "Points per trick" : "Penalty per trick missed"}</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                max="100"
+                value={scoring.pointsPerUnit}
+                onChange={(event) => setScoring((current) => ({
+                  ...current,
+                  pointsPerUnit: Number(event.target.value),
+                }))}
+              />
+            </label>
+            <label>
+              <span>{scoring.mode === "tricks" ? "Exact-bid bonus" : "Points for exact bid"}</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                max="100"
+                value={scoring.exactBidBonus}
+                onChange={(event) => setScoring((current) => ({
+                  ...current,
+                  exactBidBonus: Number(event.target.value),
+                }))}
+              />
+            </label>
+          </div>
+          <p>
+            {scoring.mode === "tricks"
+              ? `${scoring.pointsPerUnit} per trick, plus ${scoring.exactBidBonus} for an exact bid.`
+              : `${scoring.exactBidBonus} for an exact bid; otherwise −${scoring.pointsPerUnit} per trick away.`}
+          </p>
+        </fieldset>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-button" onClick={start}>Deal the first round <span>→</span></button>
       </div>
@@ -106,7 +164,10 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
 }
 
 function ActiveGame({ game, onChange, onStartOver }: { game: GameState; onChange: (game: GameState) => void; onStartOver: () => void }) {
-  const totals = useMemo(() => totalsFor(game.players, game.rounds), [game.players, game.rounds]);
+  const totals = useMemo(
+    () => totalsFor(game.players, game.rounds, game.scoring),
+    [game.players, game.rounds, game.scoring],
+  );
   const [error, setError] = useState("");
 
   if (game.stage === "complete") return <FinishedGame game={game} totals={totals} onStartOver={onStartOver} />;
@@ -199,7 +260,7 @@ function ScoreHistory({ game }: { game: GameState }) {
     <details className="history-card">
       <summary>Round history <span>{game.rounds.length} completed</span></summary>
       <div className="table-scroll"><table><thead><tr><th>Round</th>{game.players.map((player) => <th key={player.id}>{player.name}</th>)}</tr></thead>
-        <tbody>{game.rounds.map((round) => <tr key={round.roundNumber}><th>{round.roundNumber}<small>{round.cards} cards · {suitLabels[round.trump].symbol}</small></th>{game.players.map((player) => { running[player.id] += pointsFor(round.bids[player.id], round.tricks[player.id]); return <td key={player.id}><strong>{running[player.id]}</strong><small>{round.bids[player.id]} / {round.tricks[player.id]}</small></td>; })}</tr>)}</tbody>
+        <tbody>{game.rounds.map((round) => <tr key={round.roundNumber}><th>{round.roundNumber}<small>{round.cards} cards · {suitLabels[round.trump].symbol}</small></th>{game.players.map((player) => { running[player.id] += pointsFor(round.bids[player.id], round.tricks[player.id], game.scoring); return <td key={player.id}><strong>{running[player.id]}</strong><small>{round.bids[player.id]} / {round.tricks[player.id]}</small></td>; })}</tr>)}</tbody>
       </table></div>
     </details>
   );
@@ -220,7 +281,13 @@ function FinishedGame({ game, totals, onStartOver }: { game: GameState; totals: 
       const response = await fetch("/api/games", {
         method: "POST",
         headers: { "content-type": "application/json", "x-scorer-access-code": code },
-        body: JSON.stringify({ id: game.id, createdAt: game.createdAt, players: game.players, rounds: game.rounds }),
+        body: JSON.stringify({
+          id: game.id,
+          createdAt: game.createdAt,
+          players: game.players,
+          rounds: game.rounds,
+          scoring: game.scoring,
+        }),
       });
       const payload = (await response.json()) as { error?: string; ratings?: SavedRating[] };
       if (!response.ok) throw new Error(payload.error ?? "The game could not be published.");
