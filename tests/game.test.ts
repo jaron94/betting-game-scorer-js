@@ -36,8 +36,12 @@ describe("legacy Betting Game rules", () => {
   it("supports scoring by the distance from the bid", () => {
     const scoring = { mode: "difference" as const, pointsPerUnit: 2, exactBidBonus: 10 };
     expect(pointsFor(3, 3, scoring)).toBe(10);
-    expect(pointsFor(3, 5, scoring)).toBe(-4);
+    expect(pointsFor(3, 5, scoring)).toBe(4);
     expect(pointsFor(3, 2, scoring)).toBe(-2);
+  });
+
+  it("scores one overtrick as one point in difference mode", () => {
+    expect(pointsFor(2, 3, { mode: "difference", pointsPerUnit: 1, exactBidBonus: 10 })).toBe(1);
   });
 
   it("rejects an exactly-bid round", () => {
