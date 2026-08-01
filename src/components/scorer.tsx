@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  CARD_SEQUENCE,
   DEFAULT_SCORING,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
   createGame,
   currentRound,
   pointsFor,
   positionsFor,
   rollback,
+  roundSequenceFor,
   submitBids,
   submitTricks,
   totalsFor,
@@ -63,8 +65,32 @@ export function Scorer() {
 
   if (!restored) return <section className="scorer-shell loading-card">Looking for a saved game…</section>;
   return (
-    <section className="scorer-shell" aria-label="Game scorer">
-      {game ? <ActiveGame game={game} onChange={setGame} onStartOver={startOver} /> : <GameSetup onStart={setGame} />}
+    <>
+      {game ? null : <GameIntro />}
+      <section className={`scorer-shell${game ? " active-game-shell" : ""}`} aria-label="Game scorer">
+        {game ? <ActiveGame game={game} onChange={setGame} onStartOver={startOver} /> : <GameSetup onStart={setGame} />}
+      </section>
+      {game ? null : <RulesOverview />}
+    </>
+  );
+}
+
+function GameIntro() {
+  return (
+    <section className="hero">
+      <div className="eyebrow">Flexible rounds · {MIN_PLAYERS}–{MAX_PLAYERS} players · Elo ranked</div>
+      <h1>Keep your eyes on the cards.</h1>
+      <p>We’ll remember every bid, total every score, and settle the leaderboard when the last trick lands.</p>
+    </section>
+  );
+}
+
+function RulesOverview() {
+  return (
+    <section className="rules-strip" aria-label="Scoring rules">
+      <article><span>01</span><h2>Bid carefully</h2><p>The table cannot bid exactly the number of available tricks.</p></article>
+      <article><span>02</span><h2>Choose your scoring</h2><p>Use the core rules or score the signed difference from each bid.</p></article>
+      <article><span>03</span><h2>Climb the table</h2><p>Final positions update a multiplayer Elo rating after each game.</p></article>
     </section>
   );
 }
@@ -74,6 +100,8 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
   const [names, setNames] = useState(["", "", "", ""]);
   const [scoring, setScoring] = useState<ScoringConfig>({ ...DEFAULT_SCORING });
   const [error, setError] = useState("");
+  const cardSequence = roundSequenceFor(count);
+  const highestRound = cardSequence[0];
 
   function updateCount(next: number) {
     setCount(next);
@@ -94,9 +122,10 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
         <div className="step-label">Game setup</div>
         <h2>Who’s at the table?</h2>
         <p>Enter players in dealing order. The first name deals round one.</p>
+        <p>{cardSequence.length} {cardSequence.length === 1 ? "round" : "rounds"} · {highestRound === 1 ? "1 card" : `${highestRound} → 1 → ${highestRound}`}</p>
         <label className="count-label">Number of players <strong>{count}</strong></label>
-        <input className="range" type="range" min="2" max="7" value={count} onChange={(event) => updateCount(Number(event.target.value))} />
-        <div className="range-labels"><span>2</span><span>7</span></div>
+        <input className="range" type="range" min={MIN_PLAYERS} max={MAX_PLAYERS} value={count} onChange={(event) => updateCount(Number(event.target.value))} />
+        <div className="range-labels"><span>{MIN_PLAYERS}</span><span>{MAX_PLAYERS}</span></div>
       </div>
       <div className="player-form">
         {names.map((name, index) => (
@@ -164,6 +193,7 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
 }
 
 function ActiveGame({ game, onChange, onStartOver }: { game: GameState; onChange: (game: GameState) => void; onStartOver: () => void }) {
+  const cardSequence = roundSequenceFor(game.players.length);
   const totals = useMemo(
     () => totalsFor(game.players, game.rounds, game.scoring),
     [game.players, game.rounds, game.scoring],
@@ -186,10 +216,10 @@ function ActiveGame({ game, onChange, onStartOver }: { game: GameState; onChange
   return (
     <>
       <div className="game-toolbar">
-        <div><span className="step-label">Round {round.roundNumber} of {CARD_SEQUENCE.length}</span><strong>{round.cards} {round.cards === 1 ? "card" : "cards"} · <i className={round.trump === "hearts" || round.trump === "diamonds" ? "red-suit" : ""}>{suit.symbol}</i> {suit.label}</strong></div>
+        <div><span className="step-label">Round {round.roundNumber} of {cardSequence.length}</span><strong>{round.cards} {round.cards === 1 ? "card" : "cards"} · <i className={round.trump === "hearts" || round.trump === "diamonds" ? "red-suit" : ""}>{suit.symbol}</i> {suit.label}</strong></div>
         <div className="toolbar-actions"><button className="text-button" onClick={undo}>↶ Undo</button><button className="text-button danger" onClick={onStartOver}>New game</button></div>
       </div>
-      <div className="progress-track"><span style={{ width: `${((game.roundIndex + (game.stage === "results" ? 0.5 : 0)) / CARD_SEQUENCE.length) * 100}%` }} /></div>
+      <div className="progress-track"><span style={{ width: `${((game.roundIndex + (game.stage === "results" ? 0.5 : 0)) / cardSequence.length) * 100}%` }} /></div>
       <div className="play-layout">
         <RoundEntry key={`${game.roundIndex}-${game.stage}`} game={game} error={error} setError={setError} onSubmit={onChange} />
         <Standings players={game.players} totals={totals} roundsPlayed={game.rounds.length} dealerId={round.dealer.id} />
@@ -302,7 +332,7 @@ function FinishedGame({ game, totals, onStartOver }: { game: GameState; totals: 
 
   return (
     <div className="finish-card">
-      <div className="winner-banner"><span className="step-label">Game complete</span><div className="trophy">♠</div><h2>{ordered.filter((player) => positions[player.id] === 1).map(({ name }) => name).join(" & ")} {ordered.filter((player) => positions[player.id] === 1).length > 1 ? "tie" : "wins"}!</h2><p>Thirteen rounds, counted and settled.</p></div>
+      <div className="winner-banner"><span className="step-label">Game complete</span><div className="trophy">♠</div><h2>{ordered.filter((player) => positions[player.id] === 1).map(({ name }) => name).join(" & ")} {ordered.filter((player) => positions[player.id] === 1).length > 1 ? "tie" : "wins"}!</h2><p>{game.rounds.length} {game.rounds.length === 1 ? "round" : "rounds"}, counted and settled.</p></div>
       <ol className="final-table">
         {ordered.map((player) => { const rating = ratings.find(({ name }) => name === player.name); return <li key={player.id}><span className="place">{positions[player.id]}</span><span><strong>{player.name}</strong>{rating && <small>{rating.change >= 0 ? "+" : ""}{rating.change.toFixed(1)} Elo · now {Math.round(rating.ratingAfter)}</small>}</span><strong>{totals[player.id]} pts</strong></li>; })}
       </ol>

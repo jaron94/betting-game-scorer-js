@@ -40,6 +40,7 @@ main { min-height: calc(100vh - 160px); }
 
 .scorer-shell, .leaderboard-card, .method-note { max-width: 1080px; margin: 0 auto 72px; }
 .scorer-shell { background: var(--card); border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow); overflow: hidden; }
+.scorer-shell.active-game-shell { margin-top: 28px; }
 .setup-grid { min-height: 520px; display: grid; grid-template-columns: .9fr 1.1fr; }
 .setup-copy { padding: 58px; background: var(--green); color: white; position: relative; overflow: hidden; }
 .setup-copy::after { content: "♣"; position: absolute; right: -42px; bottom: -105px; font-family: Georgia, serif; font-size: 290px; color: rgba(255,255,255,.035); transform: rotate(12deg); }
@@ -173,6 +174,7 @@ th small, td small { display: block; color: var(--muted); font-size: 10px; font-
   .hero h1 { font-size: 47px; }
   .hero p { font-size: 15px; }
   .scorer-shell { border-radius: 18px; margin-bottom: 55px; }
+  .scorer-shell.active-game-shell { margin-top: 16px; }
   .setup-grid { grid-template-columns: 1fr; }
   .setup-copy { min-height: 340px; }
   .count-label { margin-top: 35px; }

@@ -4,7 +4,7 @@ A mobile-first scorer for the Betting Game (Contract Whist), rebuilt from the or
 
 ## Features
 
-- The original 13-round `7 → 1 → 7` card sequence and rotating dealer order
+- A deck-aware card sequence: `7 → 1 → 7` for up to seven players, with fewer cards and rounds for larger tables
 - Spades, hearts, diamonds, clubs, and no-trumps cycle
 - Bid and trick validation, including the “exactly bid” restriction
 - Per-game scoring rules, with the original 1-point-per-trick and 10-point exact-bid bonus as defaults

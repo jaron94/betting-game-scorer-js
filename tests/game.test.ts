@@ -6,6 +6,7 @@ import {
   currentRound,
   pointsFor,
   rollback,
+  roundSequenceFor,
   submitBids,
   submitTricks,
   totalsFor,
@@ -14,6 +15,14 @@ import {
 describe("legacy Betting Game rules", () => {
   it("uses the original 7 down to 1 and back to 7 sequence", () => {
     expect(CARD_SEQUENCE).toEqual([7, 6, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7]);
+    expect(roundSequenceFor(2)).toEqual(CARD_SEQUENCE);
+    expect(roundSequenceFor(7)).toEqual(CARD_SEQUENCE);
+  });
+
+  it("reduces the number of cards and rounds for larger tables", () => {
+    expect(roundSequenceFor(8)).toEqual([6, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6]);
+    expect(roundSequenceFor(10)).toEqual([5, 4, 3, 2, 1, 2, 3, 4, 5]);
+    expect(roundSequenceFor(52)).toEqual([1]);
   });
 
   it("awards tricks plus ten points for matching the bid", () => {
