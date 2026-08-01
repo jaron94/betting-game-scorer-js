@@ -1,5 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import Link from "next/link";
+import {
+  ConnectionStatus,
+  OfflineLink,
+  OfflineProvider,
+  PendingSyncBanner,
+} from "@/components/offline-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,24 +22,30 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body>
-        <header className="site-header">
-          <Link href="/" className="brand" aria-label="Betting Game Scorer home">
-            <span className="brand-mark" aria-hidden="true">♠</span>
-            <span>
-              <strong>Betting Game</strong>
-              <small>Scorer</small>
-            </span>
-          </Link>
-          <nav aria-label="Main navigation">
-            <Link href="/">Score a game</Link>
-            <Link href="/leaderboard">Leaderboard</Link>
-          </nav>
-        </header>
-        {children}
-        <footer className="site-footer">
-          <span>Contract Whist, minus the arithmetic.</span>
-          <span className="suit-row" aria-hidden="true">♠ <i>♥</i> ♦ <i>♣</i></span>
-        </footer>
+        <OfflineProvider>
+          <header className="site-header">
+            <OfflineLink href="/" className="brand" aria-label="Betting Game Scorer home">
+              <span className="brand-mark" aria-hidden="true">♠</span>
+              <span>
+                <strong>Betting Game</strong>
+                <small>Scorer</small>
+              </span>
+            </OfflineLink>
+            <div className="header-actions">
+              <ConnectionStatus />
+              <nav aria-label="Main navigation">
+                <OfflineLink href="/">Score a game</OfflineLink>
+                <OfflineLink href="/leaderboard">Leaderboard</OfflineLink>
+              </nav>
+            </div>
+          </header>
+          <PendingSyncBanner />
+          {children}
+          <footer className="site-footer">
+            <span>Contract Whist, minus the arithmetic.</span>
+            <span className="suit-row" aria-hidden="true">♠ <i>♥</i> ♦ <i>♣</i></span>
+          </footer>
+        </OfflineProvider>
       </body>
     </html>
   );

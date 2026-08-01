@@ -10,7 +10,10 @@ A mobile-first scorer for the Betting Game (Contract Whist), rebuilt from the or
 - Independent first-bidder and leader rules
 - Bid and trick validation, including simultaneous forehead bidding and the one-card exact-bid exception
 - Core, Oh Hell, and signed-difference scoring with configurable values
-- Live standings, rollback, and local autosave
+- Installable Progressive Web App with a cached scorer for reliable offline play
+- Live standings, rollback, and local autosave after every step
+- Durable offline result queue with automatic publishing after reconnection
+- Last-known leaderboard available offline with a visible saved-data timestamp
 - Complete game, round, score, and Elo history in Postgres
 - Pairwise multiplayer Elo with ties and field-size normalisation
 - Responsive interface designed for use around a card table
@@ -27,6 +30,12 @@ npm run dev
 ```
 
 The scorer works without a database, but completed games cannot be published and the leaderboard remains empty until `DATABASE_URL` is configured.
+
+## Offline use
+
+Open the deployed app once while online so its service worker can cache the scorer. It can then be installed from the browser and reopened without a connection. Active games remain in local storage, while completed results waiting to publish are kept separately in IndexedDB. Queued results are retried automatically when the connection returns while the app is open, or when the app is next launched online.
+
+If `SCORER_ACCESS_CODE` is configured, the code is never stored on the device. A queued result that needs authorisation remains safe in the outbox and the app prompts for the code after reconnection. The leaderboard shows its last downloaded snapshot offline and clearly labels when that snapshot was saved.
 
 ## Rules and presets
 
@@ -62,7 +71,7 @@ npm run test:e2e
 npm run build
 ```
 
-The Playwright suite starts the Next.js app and checks both core and signed-difference scoring in Chromium. Install the browser once before running it locally:
+The Playwright suite starts the Next.js app and checks scoring, installation metadata, offline reloads, queued publishing after reconnection, and cached leaderboard access in Chromium. Install the browser once before running it locally:
 
 ```bash
 npx playwright install chromium
