@@ -77,3 +77,22 @@ test("restores the introduction when starting a new game", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Who’s at the table?" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Scoring rules" })).toBeVisible();
 });
+
+test("uses a shorter card sequence for eight players", async ({ page }) => {
+  await page.goto("/");
+
+  const playerCount = page.locator('input[type="range"]');
+  await playerCount.focus();
+  await playerCount.press("Home");
+  for (let index = 0; index < 6; index += 1) await playerCount.press("ArrowRight");
+
+  await expect(page.getByText("11 rounds · 6 → 1 → 6")).toBeVisible();
+  for (let index = 0; index < 8; index += 1) {
+    const label = index === 0 ? "First dealer" : `Player ${index + 1}`;
+    await page.getByLabel(label).fill(`Player ${index + 1}`);
+  }
+
+  await page.getByRole("button", { name: "Deal the first round" }).click();
+  await expect(page.getByText("Round 1 of 11")).toBeVisible();
+  await expect(page.getByText("6 cards ·")).toBeVisible();
+});
