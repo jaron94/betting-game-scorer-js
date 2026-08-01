@@ -4,12 +4,10 @@ async function setUpTwoPlayers(page: Page) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Who’s at the table?" })).toBeVisible();
 
-  await page.locator('input[type="range"]').evaluate((element) => {
-    const input = element as HTMLInputElement;
-    input.value = "2";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  const playerCount = page.locator('input[type="range"]');
+  await playerCount.focus();
+  await playerCount.press("Home");
+  await expect(page.getByLabel("Player 3")).toHaveCount(0);
   await page.getByLabel("First dealer").fill("Ada");
   await page.getByLabel("Player 2").fill("Ben");
 }
