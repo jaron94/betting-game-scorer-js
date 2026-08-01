@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,700&display=swap');
-
 :root {
   --ink: #17211d;
   --muted: #63706a;
@@ -29,6 +27,18 @@ a { color: inherit; }
 .site-header nav { display: flex; gap: 6px; }
 .site-header nav a { text-decoration: none; padding: 10px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; }
 .site-header nav a:hover { background: rgba(16, 63, 54, .08); }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.connection-status { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: var(--card); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.connection-status i { width: 7px; height: 7px; border-radius: 50%; background: #4f8b68; }
+.connection-status.offline { border-color: #ddb7ae; color: #8d312d; background: #fff4f1; }
+.connection-status.offline i { background: var(--red); }
+.pending-sync-banner { max-width: 1080px; margin: 18px auto 0; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border: 1px solid #b9cdbf; border-radius: 14px; background: #edf5e8; color: var(--green); }
+.pending-sync-banner strong, .pending-sync-banner span { display: block; }
+.pending-sync-banner span { margin-top: 3px; color: #557069; font-size: 12px; }
+.pending-sync-actions { display: flex; align-items: end; gap: 10px; }
+.pending-sync-actions label { min-width: 190px; }
+.pending-sync-actions input { padding: 9px 11px; background: white; }
+.pending-sync-actions .text-button { white-space: nowrap; background: white; }
 
 main { min-height: calc(100vh - 160px); }
 .hero { max-width: 840px; margin: 0 auto; padding: 78px 28px 48px; text-align: center; }
@@ -135,6 +145,9 @@ th small, td small { display: block; color: var(--muted); font-size: 10px; font-
 .publish-panel .primary-button { margin-top: 12px; }
 .success-message { min-height: 60px; display: flex; flex-direction: column; justify-content: center; color: #275f44; }
 .success-message span { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.queued-message { margin-bottom: 14px; padding: 12px 13px; border-radius: 9px; background: #fff5d9; color: #755716; }
+.queued-message strong, .queued-message span { display: block; }
+.queued-message span { margin-top: 3px; color: #776b4d; font-size: 12px; }
 .finish-new { margin: 0 40px 32px; justify-self: start; }
 
 .rules-strip { max-width: 1080px; margin: 0 auto 90px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px; }
@@ -149,6 +162,8 @@ th small, td small { display: block; color: var(--muted); font-size: 10px; font-
 .leaderboard-list li { display: grid; grid-template-columns: 48px 1fr 140px 210px; align-items: center; min-height: 78px; padding: 0 32px; border-bottom: 1px solid var(--line); }
 .leaderboard-list li:last-child { border-bottom: 0; }
 .leaderboard-list li:first-child { background: #f4f8e9; }
+.leaderboard-cache-note { max-width: 1080px; margin: -48px auto 18px; padding: 12px 16px; display: flex; align-items: baseline; gap: 10px; border: 1px solid #dccb9a; border-radius: 12px; background: #fff8df; color: #755716; }
+.leaderboard-cache-note span { color: #776b4d; font-size: 12px; }
 .rank { font-family: "Playfair Display", Georgia, serif; font-size: 24px; font-style: italic; color: #6e7b75; }
 .rating strong, .record strong { display: block; }
 .rating strong { font-size: 22px; }
@@ -165,6 +180,7 @@ th small, td small { display: block; color: var(--muted); font-size: 10px; font-
 
 @media (max-width: 900px) {
   .scorer-shell, .leaderboard-card { margin-left: 16px; margin-right: 16px; }
+  .pending-sync-banner, .leaderboard-cache-note { margin-left: 16px; margin-right: 16px; }
   .setup-copy { padding: 44px 36px; }
   .player-form { padding: 40px 34px; }
   .play-layout { grid-template-columns: 1fr 290px; }
@@ -179,6 +195,11 @@ th small, td small { display: block; color: var(--muted); font-size: 10px; font-
   .brand-mark { width: 32px; height: 40px; font-size: 19px; }
   .site-header nav { gap: 0; }
   .site-header nav a { padding: 9px 8px; font-size: 12px; }
+  .header-actions { gap: 3px; }
+  .connection-status { min-height: 25px; padding: 0 8px; font-size: 10px; }
+  .pending-sync-banner { align-items: stretch; flex-direction: column; gap: 12px; }
+  .pending-sync-actions { align-items: stretch; flex-direction: column; }
+  .pending-sync-actions label { min-width: 0; }
   .hero { padding: 55px 20px 34px; }
   .hero h1 { font-size: 47px; }
   .hero p { font-size: 15px; }
@@ -208,6 +229,7 @@ th small, td small { display: block; color: var(--muted); font-size: 10px; font-
   .finish-new { margin: 0 24px 28px; }
   .rules-strip { grid-template-columns: 1fr; gap: 20px; }
   .leaderboard-head { display: none; }
+  .leaderboard-cache-note { align-items: flex-start; flex-direction: column; gap: 4px; }
   .leaderboard-list li { grid-template-columns: 36px 1fr 65px; padding: 12px 16px; }
   .leaderboard-list .record { grid-column: 2 / -1; margin: -5px 0 5px 50px; }
   .rating { text-align: right; }

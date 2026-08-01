@@ -34,10 +34,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ratings }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The game could not be saved.";
-    const duplicate = /duplicate|unique|games_pkey/i.test(message);
+    const duplicate = /games_pkey/i.test(message);
+    if (duplicate) {
+      return NextResponse.json({ ratings: [], alreadyPublished: true }, { status: 200 });
+    }
     return NextResponse.json(
-      { error: duplicate ? "This game has already been published." : "The game could not be saved." },
-      { status: duplicate ? 409 : 500 },
+      { error: "The game could not be saved." },
+      { status: 500 },
     );
   }
 }

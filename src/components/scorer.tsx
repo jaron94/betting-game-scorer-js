@@ -25,6 +25,10 @@ import {
   type Trump,
 } from "@/lib/game";
 import type { SavedRating } from "@/db/save-game";
+import {
+  GAME_PUBLISHED_EVENT,
+  useOffline,
+} from "@/components/offline-provider";
 
 const STORAGE_KEY = "betting-game-scorer-active-game-v1";
 const suitLabels: Record<Trump, { symbol: string; label: string }> = {
@@ -409,34 +413,43 @@ function ScoreHistory({ game }: { game: GameState }) {
 function FinishedGame({ game, totals, onStartOver }: { game: GameState; totals: Record<string, number>; onStartOver: () => void }) {
   const positions = positionsFor(game.players, totals);
   const ordered = [...game.players].sort((a, b) => totals[b.id] - totals[a.id]);
+  const { isOnline, publishGame } = useOffline();
   const [code, setCode] = useState("");
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [status, setStatus] = useState<"idle" | "saving" | "queued" | "saved">("idle");
   const [error, setError] = useState("");
   const [ratings, setRatings] = useState<SavedRating[]>([]);
+
+  useEffect(() => {
+    const published = (event: Event) => {
+      const detail = (event as CustomEvent<{ id: string; ratings: SavedRating[] }>).detail;
+      if (detail.id !== game.id) return;
+      setRatings(detail.ratings);
+      setStatus("saved");
+      setError("");
+      localStorage.removeItem(STORAGE_KEY);
+    };
+    window.addEventListener(GAME_PUBLISHED_EVENT, published);
+    return () => window.removeEventListener(GAME_PUBLISHED_EVENT, published);
+  }, [game.id]);
 
   async function publish() {
     setStatus("saving");
     setError("");
     try {
-      const response = await fetch("/api/games", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-scorer-access-code": code },
-        body: JSON.stringify({
-          id: game.id,
-          createdAt: game.createdAt,
-          players: game.players,
-          rounds: game.rounds,
-          settings: game.settings,
-        }),
-      });
-      const payload = (await response.json()) as { error?: string; ratings?: SavedRating[] };
-      if (!response.ok) throw new Error(payload.error ?? "The game could not be published.");
-      setRatings(payload.ratings ?? []);
-      setStatus("saved");
-      localStorage.removeItem(STORAGE_KEY);
+      const result = await publishGame({
+        id: game.id,
+        createdAt: game.createdAt,
+        players: game.players,
+        rounds: game.rounds,
+        settings: game.settings,
+      }, code);
+      setRatings(result.ratings);
+      setStatus(result.status === "published" ? "saved" : "queued");
+      setError(result.error ?? "");
+      if (result.status === "published") localStorage.removeItem(STORAGE_KEY);
     } catch (caught) {
       setStatus("idle");
-      setError(caught instanceof Error ? caught.message : "The game could not be published.");
+      setError(caught instanceof Error ? caught.message : "The result could not be saved on this device.");
     }
   }
 
@@ -448,9 +461,15 @@ function FinishedGame({ game, totals, onStartOver }: { game: GameState; totals: 
       </ol>
       <div className="publish-panel">
         {status === "saved" ? <div className="success-message"><strong>Published to the leaderboard</strong><span>The ratings are up to date.</span></div> : <>
+          {status === "queued" ? (
+            <div className="queued-message" role="status">
+              <strong>Saved on this device</strong>
+              <span>{isOnline ? "Waiting to publish to the leaderboard." : "It will publish when you reconnect."}</span>
+            </div>
+          ) : null}
           <label><span>Scorer access code <small>(if configured)</small></span><input type="password" value={code} autoComplete="off" onChange={(event) => setCode(event.target.value)} placeholder="Shared code" /></label>
           {error && <p className="form-error" role="alert">{error}</p>}
-          <button className="primary-button" disabled={status === "saving"} onClick={publish}>{status === "saving" ? "Publishing…" : "Publish result"}<span>↑</span></button>
+          <button className="primary-button" disabled={status === "saving"} onClick={publish}>{status === "saving" ? "Saving…" : status === "queued" ? "Try publishing now" : "Publish result"}<span>↑</span></button>
         </>}
       </div>
       <button className="text-button finish-new" onClick={onStartOver}>Start another game</button>
