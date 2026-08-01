@@ -17,5 +17,17 @@ describe("completed game validation", () => {
     expect(game.stage).toBe("complete");
     expect(game.rounds).toHaveLength(11);
     expect(completedGameSchema.safeParse(game).success).toBe(true);
+
+    const { settings, ...legacyGame } = game;
+    const legacyResult = completedGameSchema.safeParse({
+      ...legacyGame,
+      scoring: {
+        mode: settings.scoring.mode,
+        pointsPerUnit: settings.scoring.pointsPerUnit,
+        exactBidBonus: settings.scoring.exactBidBonus,
+      },
+    });
+    expect(legacyResult.success).toBe(true);
+    if (legacyResult.success) expect(legacyResult.data.settings.preset).toBe("custom");
   });
 });

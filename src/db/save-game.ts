@@ -19,9 +19,9 @@ export async function saveCompletedGame(game: CompletedGameInput): Promise<Saved
     await tx.insert(games).values({
       id: game.id,
       playedAt: new Date(game.createdAt),
-      scoringMode: game.scoring.mode,
-      pointsPerUnit: game.scoring.pointsPerUnit,
-      exactBidBonus: game.scoring.exactBidBonus,
+      scoringMode: game.settings.scoring.mode,
+      pointsPerUnit: game.settings.scoring.pointsPerUnit,
+      exactBidBonus: game.settings.scoring.exactBidBonus,
     });
 
     await tx
@@ -52,7 +52,7 @@ export async function saveCompletedGame(game: CompletedGameInput): Promise<Saved
       game.players.map((player) => [player.id, dbByName.get(normaliseName(player.name))!]),
     );
 
-    const totals = totalsFor(game.players, game.rounds, game.scoring);
+    const totals = totalsFor(game.players, game.rounds, game.settings.scoring);
     const positions = positionsFor(game.players, totals);
     const eloResults = calculateMultiplayerElo(
       game.players.map((player) => ({
@@ -103,7 +103,7 @@ export async function saveCompletedGame(game: CompletedGameInput): Promise<Saved
 
       await tx.insert(roundResults).values(
         game.players.map((player) => {
-          const points = pointsFor(round.bids[player.id], round.tricks[player.id], game.scoring);
+          const points = pointsFor(round.bids[player.id], round.tricks[player.id], game.settings.scoring);
           runningTotals[player.id] += points;
           return {
             roundId: savedRound.id,

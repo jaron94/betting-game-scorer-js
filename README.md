@@ -4,11 +4,12 @@ A mobile-first scorer for the Betting Game (Contract Whist), rebuilt from the or
 
 ## Features
 
-- A deck-aware card sequence: `7 → 1 → 7` for up to seven players, with fewer cards and rounds for larger tables
-- Spades, hearts, diamonds, clubs, and no-trumps cycle
-- Bid and trick validation, including the “exactly bid” restriction
-- Per-game scoring rules, with the original 1-point-per-trick and 10-point exact-bid bonus as defaults
-- Optional difference scoring where overtricks are positive and undertricks are negative
+- Configurable starting and ending cards, constrained by a 52-card deck
+- Betting Game, Oh Hell, and Betting Game Alternative presets with editable settings
+- Automatic suit/no-trumps cycling or manual trump choice from a cut card
+- Independent first-bidder and leader rules
+- Bid and trick validation, including simultaneous forehead bidding and the one-card exact-bid exception
+- Core, Oh Hell, and signed-difference scoring with configurable values
 - Live standings, rollback, and local autosave
 - Complete game, round, score, and Elo history in Postgres
 - Pairwise multiplayer Elo with ties and field-size normalisation
@@ -27,14 +28,15 @@ npm run dev
 
 The scorer works without a database, but completed games cannot be published and the leaderboard remains empty until `DATABASE_URL` is configured.
 
-## Scoring rules
+## Rules and presets
 
-Each game stores the scoring method selected at setup:
+Every preset fills the setup fields, and any field can then be changed independently. The card sequence descends from the starting count to one; if the ending count is greater than one, it then climbs to that count.
 
-- **Core scoring (default):** tricks won × points per trick, plus the exact-bid bonus when the bid is met.
-- **Difference scoring:** the exact-bid value when the bid is met; otherwise `(tricks − bid) × points per difference`. For example, bidding 2 and taking 3 scores 1 point with the default multiplier.
+- **Betting Game:** starts at 7 and returns to 7; scores one point per trick plus 10 for an exact bid; cycles through spades, hearts, diamonds, clubs, and no trumps; the dealer bids first and the next player leads.
+- **Oh Hell:** starts at 10 and ends at 1; scores 10 plus the bid when exact and either zero or a negative distance penalty when missed; trumps are entered each round from a cut card; the next player bids first and leads.
+- **Betting Game Alternative:** uses the Betting Game schedule, trumps, and order, but scores `(tricks − bid)` plus 10 when exact. Bidding 2 and taking 3 scores 1; bidding 3 and taking 1 scores −2.
 
-Both the per-trick value and exact-bid value can be changed before the game starts. The defaults preserve the original rules: one point per trick and a 10-point exact-bid bonus.
+Starting cards, ending cards, scoring method and values, trump determination, bidding order, leading order, and the one-card exact-bid exception can all be customised. On a one-card round, players hold cards to their foreheads and bid simultaneously.
 
 ## Database
 
