@@ -1,4 +1,4 @@
-const CACHE_NAME = "betting-game-scorer-shell-v1";
+const CACHE_NAME = "betting-game-scorer-shell-v2";
 const APP_SHELL = [
   "/",
   "/leaderboard",
@@ -31,10 +31,11 @@ async function cachePageAndAssets(path) {
   const html = await response.text();
   const assets = Array.from(html.matchAll(/(?:src|href)="([^"]+)"/g), (match) => match[1])
     .filter(sameOriginAsset);
-  await Promise.allSettled(
+  await Promise.all(
     [...new Set(assets)].map(async (asset) => {
       const assetResponse = await fetch(asset, { cache: "reload" });
-      if (assetResponse.ok) await cache.put(asset, assetResponse);
+      if (!assetResponse.ok) throw new Error(`Could not cache ${asset}.`);
+      await cache.put(asset, assetResponse);
     }),
   );
 }
@@ -74,39 +75,40 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const path = url.pathname === "/leaderboard" ? "/leaderboard" : "/";
-            void cachePageAndAssets(path);
-          }
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const path = url.pathname === "/leaderboard" ? "/leaderboard" : "/";
+        const cached = await cache.match(path);
+        if (cached) return cached;
+
+        try {
+          const response = await fetch(request);
+          if (response.ok) await cache.put(path, response.clone());
           return response;
-        })
-        .catch(async () => {
-          const cache = await caches.open(CACHE_NAME);
-          return (await cache.match(url.pathname))
-            ?? (await cache.match("/"))
-            ?? new Response("The scorer is not available offline yet. Open it once while online.", {
-              status: 503,
-              headers: { "content-type": "text/plain; charset=utf-8" },
-            });
-        }),
+        } catch {
+          return new Response("The scorer is not available offline yet. Open it once while online.", {
+            status: 503,
+            headers: { "content-type": "text/plain; charset=utf-8" },
+          });
+        }
+      }),
     );
     return;
   }
 
   if (sameOriginAsset(request.url)) {
     event.respondWith(
-      fetch(request)
-        .then(async (response) => {
-          if (response.ok) {
-            const cache = await caches.open(CACHE_NAME);
-            await cache.put(request, response.clone());
-          }
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(request);
+        if (cached) return cached;
+
+        try {
+          const response = await fetch(request);
+          if (response.ok) await cache.put(request, response.clone());
           return response;
-        })
-        .catch(async () => (await caches.match(request))
-          ?? new Response("", { status: 504, statusText: "Offline asset unavailable" })),
+        } catch {
+          return new Response("", { status: 504, statusText: "Offline asset unavailable" });
+        }
+      }),
     );
   }
 });
