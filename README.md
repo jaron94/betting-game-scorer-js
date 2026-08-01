@@ -7,7 +7,9 @@ A mobile-first scorer for the Betting Game (Contract Whist), rebuilt from the or
 - The original 13-round `7 → 1 → 7` card sequence and rotating dealer order
 - Spades, hearts, diamonds, clubs, and no-trumps cycle
 - Bid and trick validation, including the “exactly bid” restriction
-- 10-point exact-bid bonus, live standings, rollback, and local autosave
+- Per-game scoring rules, with the original 1-point-per-trick and 10-point exact-bid bonus as defaults
+- Optional difference scoring where overtricks are positive and undertricks are negative
+- Live standings, rollback, and local autosave
 - Complete game, round, score, and Elo history in Postgres
 - Pairwise multiplayer Elo with ties and field-size normalisation
 - Responsive interface designed for use around a card table
@@ -24,6 +26,15 @@ npm run dev
 ```
 
 The scorer works without a database, but completed games cannot be published and the leaderboard remains empty until `DATABASE_URL` is configured.
+
+## Scoring rules
+
+Each game stores the scoring method selected at setup:
+
+- **Core scoring (default):** tricks won × points per trick, plus the exact-bid bonus when the bid is met.
+- **Difference scoring:** the exact-bid value when the bid is met; otherwise `(tricks − bid) × points per difference`. For example, bidding 2 and taking 3 scores 1 point with the default multiplier.
+
+Both the per-trick value and exact-bid value can be changed before the game starts. The defaults preserve the original rules: one point per trick and a 10-point exact-bid bonus.
 
 ## Database
 

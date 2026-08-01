@@ -6,6 +6,19 @@ export const TRUMP_SEQUENCE = ["spades", "hearts", "diamonds", "clubs", "none"] 
 
 export type Trump = (typeof TRUMP_SEQUENCE)[number];
 export type Stage = "bidding" | "results" | "complete";
+export type ScoringMode = "tricks" | "difference";
+
+export interface ScoringConfig {
+  mode: ScoringMode;
+  pointsPerUnit: number;
+  exactBidBonus: number;
+}
+
+export const DEFAULT_SCORING: ScoringConfig = {
+  mode: "tricks",
+  pointsPerUnit: 1,
+  exactBidBonus: 10,
+};
 
 export interface PlayerSetup {
   id: string;
@@ -28,6 +41,7 @@ export interface GameState {
   roundIndex: number;
   stage: Stage;
   pendingBids: Record<string, number>;
+  scoring: ScoringConfig;
   createdAt: string;
 }
 
@@ -35,7 +49,7 @@ export function normaliseName(name: string): string {
   return name.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-GB");
 }
 
-export function createGame(names: string[]): GameState {
+export function createGame(names: string[], scoring: ScoringConfig = DEFAULT_SCORING): GameState {
   const cleaned = names.map((name) => name.trim().replace(/\s+/g, " "));
   if (cleaned.length < MIN_PLAYERS || cleaned.length > MAX_PLAYERS) {
     throw new Error(`Choose between ${MIN_PLAYERS} and ${MAX_PLAYERS} players.`);
@@ -44,6 +58,7 @@ export function createGame(names: string[]): GameState {
   if (new Set(cleaned.map(normaliseName)).size !== cleaned.length) {
     throw new Error("Player names must be unique.");
   }
+  validateScoring(scoring);
 
   return {
     id: crypto.randomUUID(),
@@ -52,8 +67,18 @@ export function createGame(names: string[]): GameState {
     roundIndex: 0,
     stage: "bidding",
     pendingBids: {},
+    scoring: { ...scoring },
     createdAt: new Date().toISOString(),
   };
+}
+
+export function validateScoring(scoring: ScoringConfig): void {
+  if (!Number.isInteger(scoring.pointsPerUnit) || scoring.pointsPerUnit < 0 || scoring.pointsPerUnit > 100) {
+    throw new Error("The per-trick value must be a whole number from 0 to 100.");
+  }
+  if (!Number.isInteger(scoring.exactBidBonus) || scoring.exactBidBonus < 0 || scoring.exactBidBonus > 100) {
+    throw new Error("The exact-bid value must be a whole number from 0 to 100.");
+  }
 }
 
 export function currentRound(state: GameState) {
@@ -92,16 +117,27 @@ export function validateTricks(tricks: Record<string, number>, playerIds: string
   }
 }
 
-export function pointsFor(bid: number, tricks: number): number {
-  return tricks + (bid === tricks ? 10 : 0);
+export function pointsFor(
+  bid: number,
+  tricks: number,
+  scoring: ScoringConfig = DEFAULT_SCORING,
+): number {
+  const base = scoring.mode === "tricks"
+    ? tricks * scoring.pointsPerUnit
+    : (tricks - bid) * scoring.pointsPerUnit;
+  return base + (bid === tricks ? scoring.exactBidBonus : 0);
 }
 
-export function totalsFor(players: PlayerSetup[], rounds: RoundResult[]): Record<string, number> {
+export function totalsFor(
+  players: PlayerSetup[],
+  rounds: RoundResult[],
+  scoring: ScoringConfig = DEFAULT_SCORING,
+): Record<string, number> {
   return Object.fromEntries(
     players.map((player) => [
       player.id,
       rounds.reduce(
-        (total, round) => total + pointsFor(round.bids[player.id], round.tricks[player.id]),
+        (total, round) => total + pointsFor(round.bids[player.id], round.tricks[player.id], scoring),
         0,
       ),
     ]),

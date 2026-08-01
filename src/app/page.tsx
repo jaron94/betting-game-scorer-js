@@ -11,7 +11,7 @@ export default function Home() {
       <Scorer />
       <section className="rules-strip" aria-label="Scoring rules">
         <article><span>01</span><h2>Bid carefully</h2><p>The table cannot bid exactly the number of available tricks.</p></article>
-        <article><span>02</span><h2>Hit your number</h2><p>Every trick is a point. Match your bid for a 10-point bonus.</p></article>
+        <article><span>02</span><h2>Choose your scoring</h2><p>Use the core rules or score the signed difference from each bid.</p></article>
         <article><span>03</span><h2>Climb the table</h2><p>Final positions update a multiplayer Elo rating after each game.</p></article>
       </section>
     </main>

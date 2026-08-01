@@ -16,7 +16,7 @@
 * { box-sizing: border-box; }
 html { background: var(--paper); scroll-behavior: smooth; }
 body { margin: 0; color: var(--ink); background: var(--paper); font-family: "DM Sans", Arial, sans-serif; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; }
 
@@ -53,8 +53,12 @@ main { min-height: calc(100vh - 160px); }
 .player-form { padding: 46px 58px; display: grid; align-content: center; grid-template-columns: 1fr 1fr; gap: 18px; }
 .player-form label:first-child { grid-column: 1 / -1; }
 label > span { display: block; margin-bottom: 7px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-input { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 13px 14px; border-radius: 10px; outline: none; }
-input:focus { border-color: #4f7c70; box-shadow: 0 0 0 3px rgba(79,124,112,.13); }
+input, select { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 13px 14px; border-radius: 10px; outline: none; }
+input:focus, select:focus { border-color: #4f7c70; box-shadow: 0 0 0 3px rgba(79,124,112,.13); }
+.scoring-settings { grid-column: 1 / -1; margin: 6px 0 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #faf8f2; }
+.scoring-settings legend { padding: 0 7px; color: var(--green); font-family: "Playfair Display", Georgia, serif; font-size: 17px; font-weight: 700; }
+.scoring-number-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+.scoring-settings > p { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .primary-button { grid-column: 1 / -1; width: 100%; min-height: 52px; margin-top: 4px; padding: 0 20px; border: 0; border-radius: 11px; display: flex; align-items: center; justify-content: space-between; background: var(--green); color: white; cursor: pointer; font-weight: 700; }
 .primary-button:hover { background: #0a312a; }
 .primary-button:disabled { opacity: .55; cursor: wait; }
@@ -174,6 +178,8 @@ th small, td small { display: block; color: var(--muted); font-size: 10px; font-
   .count-label { margin-top: 35px; }
   .player-form { grid-template-columns: 1fr; padding: 32px 24px; }
   .player-form label:first-child { grid-column: auto; }
+  .scoring-settings { grid-column: auto; }
+  .scoring-number-grid { grid-template-columns: 1fr; }
   .game-toolbar { padding: 20px; align-items: flex-start; }
   .toolbar-actions { flex-direction: column; align-items: flex-end; }
   .text-button { padding: 6px 8px; }

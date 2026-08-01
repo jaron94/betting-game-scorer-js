@@ -29,6 +29,9 @@ export const players = pgTable(
 export const games = pgTable("games", {
   id: uuid("id").primaryKey(),
   playedAt: timestamp("played_at", { withTimezone: true }).notNull(),
+  scoringMode: text("scoring_mode").notNull().default("tricks"),
+  pointsPerUnit: integer("points_per_unit").notNull().default(1),
+  exactBidBonus: integer("exact_bid_bonus").notNull().default(10),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
