@@ -56,7 +56,14 @@ Every pair of players in a finished game is treated as an Elo result: higher fin
 npm run lint
 npm run typecheck
 npm test
+npm run test:e2e
 npm run build
+```
+
+The Playwright suite starts the Next.js app and checks both core and signed-difference scoring in Chromium. Install the browser once before running it locally:
+
+```bash
+npx playwright install chromium
 ```
 
 ## Deploy to Vercel
