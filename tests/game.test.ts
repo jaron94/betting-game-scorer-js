@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CARD_SEQUENCE,
+  DEFAULT_SCORING,
   createGame,
   currentRound,
   pointsFor,
@@ -19,6 +20,24 @@ describe("legacy Betting Game rules", () => {
     expect(pointsFor(3, 3)).toBe(13);
     expect(pointsFor(3, 4)).toBe(4);
     expect(pointsFor(0, 0)).toBe(10);
+  });
+
+  it("uses the core scoring configuration by default", () => {
+    const game = createGame(["Ada", "Ben"]);
+    expect(game.scoring).toEqual(DEFAULT_SCORING);
+  });
+
+  it("supports configurable trick points and exact-bid bonuses", () => {
+    const scoring = { mode: "tricks" as const, pointsPerUnit: 2, exactBidBonus: 5 };
+    expect(pointsFor(3, 3, scoring)).toBe(11);
+    expect(pointsFor(3, 4, scoring)).toBe(8);
+  });
+
+  it("supports scoring by the distance from the bid", () => {
+    const scoring = { mode: "difference" as const, pointsPerUnit: 2, exactBidBonus: 10 };
+    expect(pointsFor(3, 3, scoring)).toBe(10);
+    expect(pointsFor(3, 5, scoring)).toBe(-4);
+    expect(pointsFor(3, 2, scoring)).toBe(-2);
   });
 
   it("rejects an exactly-bid round", () => {
