@@ -36,19 +36,6 @@ test("reloads and scores offline, then publishes the queued result on reconnect"
   context,
   page,
 }) => {
-  await page.route("**/api/games", async (route) => {
-    await route.fulfill({
-      status: 201,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ratings: [
-          { name: "Ada", ratingBefore: 1000, ratingAfter: 984, change: -16 },
-          { name: "Ben", ratingBefore: 1000, ratingAfter: 1016, change: 16 },
-        ],
-      }),
-    });
-  });
-
   await setUpOneRoundGame(page);
   await waitForOfflineShell(page);
   await expect.poll(() => page.evaluate(() => (
@@ -56,6 +43,7 @@ test("reloads and scores offline, then publishes the queued result on reconnect"
   ))).toBe(true);
   await context.setOffline(true);
   await page.reload();
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
 
   await expect(page.getByTestId("connection-status")).toHaveAttribute("data-online", "false");
   await expect(page.getByRole("heading", { name: "Place the bids" })).toBeVisible();
@@ -70,7 +58,20 @@ test("reloads and scores offline, then publishes the queued result on reconnect"
   await expect(page.getByText("Saved on this device", { exact: true })).toBeVisible();
   await expect(page.getByText("1 completed game is saved on this device.")).toBeVisible();
 
+  await page.route("**/api/games", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ratings: [
+          { name: "Ada", ratingBefore: 1000, ratingAfter: 984, change: -16 },
+          { name: "Ben", ratingBefore: 1000, ratingAfter: 1016, change: 16 },
+        ],
+      }),
+    });
+  });
   await context.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await expect(page.getByText("Published to the leaderboard")).toBeVisible();
   await expect(page.getByText("1 completed game is saved on this device.")).toHaveCount(0);
   await expect(page.locator(".final-table li").filter({ hasText: "Ben" })).toContainText("+16.0 Elo");
@@ -116,8 +117,10 @@ test("shows the last downloaded leaderboard while offline", async ({ context, pa
     return found;
   })).toBe(true);
 
+  await page.unroute("**/api/leaderboard");
   await context.setOffline(true);
   await page.reload();
+  await page.evaluate(() => window.dispatchEvent(new Event("offline")));
 
   await expect(page.getByText("Ada", { exact: true })).toBeVisible();
   await expect(page.getByText("Saved standings")).toBeVisible();
