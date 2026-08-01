@@ -46,7 +46,9 @@ test("uses the core scoring configuration by default", async ({ page }) => {
   await expect(page.getByLabel("Rules preset")).toHaveValue("betting-game");
   await expect(page.getByLabel("Scoring method")).toHaveValue("tricks");
   await expect(page.getByLabel("Points per trick")).toHaveValue("1");
-  await expect(page.getByLabel("Exact-bid bonus")).toHaveValue("10");
+  await expect(
+    page.getByRole("spinbutton", { name: "Exact-bid bonus", exact: true }),
+  ).toHaveValue("10");
 
   await scoreFirstRound(page, { Ada: 2, Ben: 2 }, { Ada: 2, Ben: 5 });
 
@@ -59,7 +61,9 @@ test("scores the signed difference between tricks and the bid", async ({ page })
 
   await page.getByLabel("Scoring method").selectOption("difference");
   await expect(page.getByLabel("Points per difference")).toHaveValue("1");
-  await expect(page.getByLabel("Exact-bid bonus")).toHaveValue("10");
+  await expect(
+    page.getByRole("spinbutton", { name: "Exact-bid bonus", exact: true }),
+  ).toHaveValue("10");
 
   await scoreFirstRound(page, { Ada: 4, Ben: 4 }, { Ada: 3, Ben: 4 });
 
