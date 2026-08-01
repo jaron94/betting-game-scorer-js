@@ -2,6 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function setUpTwoPlayers(page: Page) {
   await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Keep your eyes on the cards." })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Scoring rules" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Who’s at the table?" })).toBeVisible();
 
   const playerCount = page.locator('input[type="range"]');
@@ -19,6 +21,8 @@ async function scoreFirstRound(
 ) {
   await page.getByRole("button", { name: "Deal the first round" }).click();
   await expect(page.getByRole("heading", { name: "Place the bids" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Keep your eyes on the cards." })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Scoring rules" })).toHaveCount(0);
 
   await page.getByLabel("Ada bid").fill(String(bids.Ada));
   await page.getByLabel("Ben bid").fill(String(bids.Ben));
@@ -60,4 +64,16 @@ test("scores the signed difference between tricks and the bid", async ({ page })
 
   await expect(scoreFor(page, "Ada")).toHaveText("-1");
   await expect(scoreFor(page, "Ben")).toHaveText("10");
+});
+
+test("restores the introduction when starting a new game", async ({ page }) => {
+  await setUpTwoPlayers(page);
+  await page.getByRole("button", { name: "Deal the first round" }).click();
+
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "New game" }).click();
+
+  await expect(page.getByRole("heading", { name: "Keep your eyes on the cards." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Who’s at the table?" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Scoring rules" })).toBeVisible();
 });
