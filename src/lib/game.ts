@@ -124,7 +124,7 @@ export function pointsFor(
 ): number {
   const base = scoring.mode === "tricks"
     ? tricks * scoring.pointsPerUnit
-    : -Math.abs(bid - tricks) * scoring.pointsPerUnit;
+    : (tricks - bid) * scoring.pointsPerUnit;
   return base + (bid === tricks ? scoring.exactBidBonus : 0);
 }
 
