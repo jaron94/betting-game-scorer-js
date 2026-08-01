@@ -1,12 +1,24 @@
 import { z } from "zod";
-import { CARD_SEQUENCE, MAX_PLAYERS, MIN_PLAYERS, TRUMP_SEQUENCE } from "@/lib/game";
+import {
+  CARD_SEQUENCE,
+  DEFAULT_SCORING,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  TRUMP_SEQUENCE,
+} from "@/lib/game";
 
 const valueMap = z.record(z.string().uuid(), z.number().int().min(0).max(7));
+const scoringSchema = z.object({
+  mode: z.enum(["tricks", "difference"]),
+  pointsPerUnit: z.number().int().min(0).max(100),
+  exactBidBonus: z.number().int().min(0).max(100),
+});
 
 export const completedGameSchema = z
   .object({
     id: z.string().uuid(),
     createdAt: z.string().datetime(),
+    scoring: scoringSchema.default(DEFAULT_SCORING),
     players: z
       .array(z.object({ id: z.string().uuid(), name: z.string().trim().min(1).max(40) }))
       .min(MIN_PLAYERS)
