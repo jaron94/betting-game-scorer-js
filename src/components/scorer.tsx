@@ -117,12 +117,12 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
               }))}
             >
               <option value="tricks">Core — tricks won + exact bonus</option>
-              <option value="difference">Difference — penalise missed tricks</option>
+              <option value="difference">Difference — tricks minus bid</option>
             </select>
           </label>
           <div className="scoring-number-grid">
             <label>
-              <span>{scoring.mode === "tricks" ? "Points per trick" : "Penalty per trick missed"}</span>
+              <span>{scoring.mode === "tricks" ? "Points per trick" : "Points per trick difference"}</span>
               <input
                 type="number"
                 inputMode="numeric"
@@ -153,7 +153,7 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
           <p>
             {scoring.mode === "tricks"
               ? `${scoring.pointsPerUnit} per trick, plus ${scoring.exactBidBonus} for an exact bid.`
-              : `${scoring.exactBidBonus} for an exact bid; otherwise −${scoring.pointsPerUnit} per trick away.`}
+              : `${scoring.exactBidBonus} for an exact bid; otherwise ${scoring.pointsPerUnit} × (tricks − bid).`}
           </p>
         </fieldset>
         {error && <p className="form-error" role="alert">{error}</p>}
