@@ -5,6 +5,7 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   TRUMP_SEQUENCE,
+  roundSequenceFor,
 } from "@/lib/game";
 
 const valueMap = z.record(z.string().uuid(), z.number().int().min(0).max(7));
@@ -35,8 +36,10 @@ export const completedGameSchema = z
     ),
   })
   .superRefine((game, ctx) => {
-    if (game.rounds.length !== CARD_SEQUENCE.length) {
-      ctx.addIssue({ code: "custom", message: `A completed game must contain ${CARD_SEQUENCE.length} rounds.` });
+    if (game.players.length < MIN_PLAYERS || game.players.length > MAX_PLAYERS) return;
+    const cardSequence = roundSequenceFor(game.players.length);
+    if (game.rounds.length !== cardSequence.length) {
+      ctx.addIssue({ code: "custom", message: `A completed game must contain ${cardSequence.length} rounds.` });
       return;
     }
     const ids = game.players.map(({ id }) => id);
@@ -45,7 +48,7 @@ export const completedGameSchema = z
       ctx.addIssue({ code: "custom", message: "Player names must be unique." });
     }
     game.rounds.forEach((round, index) => {
-      if (round.roundNumber !== index + 1 || round.cards !== CARD_SEQUENCE[index]) {
+      if (round.roundNumber !== index + 1 || round.cards !== cardSequence[index]) {
         ctx.addIssue({ code: "custom", message: `Round ${index + 1} does not match the required card sequence.` });
       }
       if (!ids.includes(round.dealerPlayerId)) {
