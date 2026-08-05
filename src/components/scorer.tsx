@@ -42,6 +42,7 @@ const suitLabels: Record<Trump, { symbol: string; label: string }> = {
 export function Scorer() {
   const [game, setGame] = useState<GameState | null>(null);
   const [restored, setRestored] = useState(false);
+  const [resetRequested, setResetRequested] = useState(false);
 
   useEffect(() => {
     let savedGame: GameState | null = null;
@@ -54,7 +55,10 @@ export function Scorer() {
       localStorage.removeItem(STORAGE_KEY);
     }
     queueMicrotask(() => {
-      if (savedGame) setGame(savedGame);
+      if (savedGame) {
+        setGame(savedGame);
+        scrollPageToTop();
+      }
       setRestored(true);
     });
   }, []);
@@ -65,9 +69,10 @@ export function Scorer() {
     else localStorage.removeItem(STORAGE_KEY);
   }, [game, restored]);
 
-  function startOver() {
-    if (game && !window.confirm("Start a new game and remove the saved game from this device?")) return;
+  function confirmStartOver() {
     setGame(null);
+    setResetRequested(false);
+    scrollPageToTop();
   }
 
   if (!restored) return <section className="scorer-shell loading-card">Looking for a saved game…</section>;
@@ -75,10 +80,40 @@ export function Scorer() {
     <>
       {game ? null : <GameIntro />}
       <section className={`scorer-shell${game ? " active-game-shell" : ""}`} aria-label="Game scorer">
-        {game ? <ActiveGame game={game} onChange={setGame} onStartOver={startOver} /> : <GameSetup onStart={setGame} />}
+        {game ? <ActiveGame game={game} onChange={setGame} onStartOver={() => setResetRequested(true)} /> : <GameSetup onStart={setGame} />}
       </section>
       {game ? null : <RulesOverview />}
+      {resetRequested ? (
+        <ResetGameDialog
+          onCancel={() => setResetRequested(false)}
+          onConfirm={confirmStartOver}
+        />
+      ) : null}
     </>
+  );
+}
+
+function scrollPageToTop() {
+  window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "auto" }));
+}
+
+function ResetGameDialog({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="dialog-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onCancel();
+    }} onKeyDown={(event) => {
+      if (event.key === "Escape") onCancel();
+    }}>
+      <section className="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="reset-game-title" aria-describedby="reset-game-description">
+        <span className="step-label">Start again?</span>
+        <h2 id="reset-game-title">Leave this game?</h2>
+        <p id="reset-game-description">The current game and its saved progress will be removed from this device.</p>
+        <div className="dialog-actions">
+          <button className="text-button" autoFocus onClick={onCancel}>Keep playing</button>
+          <button className="danger-button" onClick={onConfirm}>Start a new game</button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -110,6 +145,7 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
   const cardSequence = roundSequenceFor(count, settings.startingCards, settings.endingCards);
 
   function updateCount(next: number) {
+    setError("");
     setCount(next);
     setNames((current) => Array.from({ length: next }, (_, index) => current[index] ?? ""));
     setSettings((current) => {
@@ -126,9 +162,19 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
   function start() {
     try {
       onStart(createGame(names, settings));
+      scrollPageToTop();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not start the game.");
     }
+  }
+
+  function updateSettings(next: GameSettings) {
+    setError("");
+    setSettings(next);
+  }
+
+  function selectPreset(preset: GamePreset) {
+    if (preset !== "custom") updateSettings(settingsForPreset(preset, count));
   }
 
   return (
@@ -143,17 +189,33 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
         <div className="range-labels"><span>{MIN_PLAYERS}</span><span>{MAX_PLAYERS}</span></div>
       </div>
       <div className="player-form">
-        <GameSettingsEditor
-          playerCount={count}
-          settings={settings}
-          onChange={setSettings}
-        />
+        <label className="preset-picker first-player">
+          <span>Rules preset</span>
+          <select value={settings.preset} onChange={(event) => selectPreset(event.target.value as GamePreset)}>
+            <option value="betting-game">Betting game</option>
+            <option value="oh-hell">Oh Hell</option>
+            <option value="betting-alternative">Betting game alternative</option>
+            {settings.preset === "custom" ? <option value="custom">Custom</option> : null}
+          </select>
+          <small>{scoringDescription(settings)}</small>
+        </label>
         {names.map((name, index) => (
           <label className={index === 0 ? "first-player" : undefined} key={index}>
             <span>{index === 0 ? "First dealer" : `Player ${index + 1}`}</span>
-            <input value={name} maxLength={40} autoComplete="off" placeholder={index === 0 ? "e.g. Jonathan" : "Name"} onChange={(event) => setNames((current) => current.map((value, i) => i === index ? event.target.value : value))} />
+            <input value={name} maxLength={40} autoComplete="off" placeholder={index === 0 ? "e.g. Jonathan" : "Name"} onChange={(event) => {
+              setError("");
+              setNames((current) => current.map((value, i) => i === index ? event.target.value : value));
+            }} />
           </label>
         ))}
+        <details className="rules-disclosure">
+          <summary><span>Customise rules</span><small>{settings.preset === "custom" ? "Custom rules applied" : "Optional"}</small></summary>
+          <GameSettingsEditor
+            playerCount={count}
+            settings={settings}
+            onChange={updateSettings}
+          />
+        </details>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-button" onClick={start}>Deal the first round <span>→</span></button>
       </div>
@@ -186,23 +248,10 @@ function GameSettingsEditor({
     customise({ scoring: { ...settings.scoring, ...patch } });
   }
 
-  function selectPreset(preset: GamePreset) {
-    if (preset !== "custom") onChange(settingsForPreset(preset, playerCount));
-  }
-
   return (
     <fieldset className="rules-settings">
-      <legend>Game rules</legend>
+      <legend>Rule details</legend>
       <div className="settings-grid">
-        <label className="wide-setting">
-          <span>Rules preset</span>
-          <select value={settings.preset} onChange={(event) => selectPreset(event.target.value as GamePreset)}>
-            <option value="betting-game">Betting game</option>
-            <option value="oh-hell">Oh Hell</option>
-            <option value="betting-alternative">Betting game alternative</option>
-            {settings.preset === "custom" ? <option value="custom">Custom</option> : null}
-          </select>
-        </label>
         <label>
           <span>Starting cards</span>
           <select value={settings.startingCards} onChange={(event) => customise({ startingCards: Number(event.target.value) })}>
@@ -332,6 +381,26 @@ function RoundEntry({ game, error, setError, onSubmit }: { game: GameState; erro
   const [values, setValues] = useState<Record<string, number>>(initial);
   const total = Object.values(values).reduce((sum, value) => sum + value, 0);
   const order = isBidding ? round.bidOrder : round.leadOrder;
+  const validBidTotal = allowExactlyBid || total !== round.cards;
+  const trumpReady = game.settings.trumpMode !== "manual" || Boolean(game.pendingTrump);
+  const canSubmit = isBidding ? validBidTotal && trumpReady : total === round.cards;
+
+  function updateValue(playerId: string, value: number) {
+    setError("");
+    setValues((current) => ({
+      ...current,
+      [playerId]: Math.min(round.cards, Math.max(0, value)),
+    }));
+  }
+
+  function guidanceText(): string {
+    if (isBidding && !trumpReady) return "Choose trumps before locking in the bids.";
+    if (isBidding && !validBidTotal) return `Change one bid — the total cannot equal ${round.cards}.`;
+    if (isBidding) return `${total} total ${total === 1 ? "bid" : "bids"}.`;
+    if (total < round.cards) return `${round.cards - total} ${round.cards - total === 1 ? "trick" : "tricks"} left to assign.`;
+    if (total > round.cards) return `${total - round.cards} too many ${total - round.cards === 1 ? "trick" : "tricks"}.`;
+    return `All ${round.cards} ${round.cards === 1 ? "trick is" : "tricks are"} assigned.`;
+  }
 
   function submit() {
     try {
@@ -347,7 +416,10 @@ function RoundEntry({ game, error, setError, onSubmit }: { game: GameState; erro
       {isBidding && game.settings.trumpMode === "manual" ? (
         <label className="trump-picker">
           <span>Trumps for this round</span>
-          <select value={game.pendingTrump ?? ""} onChange={(event) => onSubmit(chooseTrump(game, event.target.value as Trump))}>
+          <select value={game.pendingTrump ?? ""} onChange={(event) => {
+            setError("");
+            onSubmit(chooseTrump(game, event.target.value as Trump));
+          }}>
             <option value="" disabled>Choose from the cut card…</option>
             {Object.entries(suitLabels).map(([value, suit]) => <option value={value} key={value}>{suit.symbol} {suit.label}</option>)}
           </select>
@@ -369,16 +441,17 @@ function RoundEntry({ game, error, setError, onSubmit }: { game: GameState; erro
             <div className="stepper-row" key={player.id}>
               <div className="player-label"><span className="avatar-letter small">{player.name.charAt(0).toUpperCase()}</span><span><strong>{player.name}</strong>{role ? <small>{role}</small> : null}</span></div>
               <div className="stepper">
-                <button aria-label={`Decrease ${player.name}`} onClick={() => setValues((current) => ({ ...current, [player.id]: Math.max(0, current[player.id] - 1) }))}>−</button>
-                <input aria-label={`${player.name} ${isBidding ? "bid" : "tricks"}`} type="number" inputMode="numeric" min="0" max={round.cards} value={values[player.id]} onChange={(event) => setValues((current) => ({ ...current, [player.id]: Math.min(round.cards, Math.max(0, Number(event.target.value) || 0)) }))} />
-                <button aria-label={`Increase ${player.name}`} onClick={() => setValues((current) => ({ ...current, [player.id]: Math.min(round.cards, current[player.id] + 1) }))}>+</button>
+                <button aria-label={`Decrease ${player.name}`} onClick={() => updateValue(player.id, values[player.id] - 1)}>−</button>
+                <input aria-label={`${player.name} ${isBidding ? "bid" : "tricks"}`} type="number" inputMode="numeric" min="0" max={round.cards} value={values[player.id]} onChange={(event) => updateValue(player.id, Number(event.target.value) || 0)} />
+                <button aria-label={`Increase ${player.name}`} onClick={() => updateValue(player.id, values[player.id] + 1)}>+</button>
               </div>
             </div>
           );
         })}
       </div>
+      <p className={`round-guidance${canSubmit ? " valid" : ""}`} role="status">{guidanceText()}</p>
       {error && <p className="form-error" role="alert">{error}</p>}
-      <button className="primary-button" disabled={isBidding && game.settings.trumpMode === "manual" && !game.pendingTrump} onClick={submit}>{isBidding ? "Lock in bids" : "Score this round"}<span>→</span></button>
+      <button className="primary-button" disabled={!canSubmit} onClick={submit}>{isBidding ? "Lock in bids" : "Score this round"}<span>→</span></button>
     </div>
   );
 }
