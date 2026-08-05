@@ -10,6 +10,7 @@ async function setUpOneRoundGame(page: Page) {
   const playerCount = page.locator('input[type="range"]');
   await playerCount.focus();
   await playerCount.press("Home");
+  await page.getByText("Customise rules", { exact: true }).click();
   await page.getByLabel("Starting cards").selectOption("1");
   await page.getByLabel("Ending cards").selectOption("1");
   await page.getByLabel("First dealer").fill("Ada");
