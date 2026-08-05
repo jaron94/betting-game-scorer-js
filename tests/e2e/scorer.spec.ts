@@ -14,6 +14,10 @@ async function setUpTwoPlayers(page: Page) {
   await page.getByLabel("Player 2").fill("Ben");
 }
 
+async function openCustomRules(page: Page) {
+  await page.locator("summary").filter({ hasText: "Customise rules" }).click();
+}
+
 async function scoreFirstRound(
   page: Page,
   bids: { Ada: number; Ben: number },
@@ -42,6 +46,7 @@ function scoreFor(page: Page, player: string) {
 
 test("uses the core scoring configuration by default", async ({ page }) => {
   await setUpTwoPlayers(page);
+  await openCustomRules(page);
 
   await expect(page.getByLabel("Rules preset")).toHaveValue("betting-game");
   await expect(page.getByLabel("Scoring method")).toHaveValue("tricks");
@@ -58,6 +63,7 @@ test("uses the core scoring configuration by default", async ({ page }) => {
 
 test("scores the signed difference between tricks and the bid", async ({ page }) => {
   await setUpTwoPlayers(page);
+  await openCustomRules(page);
 
   await page.getByLabel("Scoring method").selectOption("difference");
   await expect(page.getByLabel("Points per difference")).toHaveValue("1");
@@ -75,8 +81,9 @@ test("restores the introduction when starting a new game", async ({ page }) => {
   await setUpTwoPlayers(page);
   await page.getByRole("button", { name: "Deal the first round" }).click();
 
-  page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "New game" }).click();
+  await expect(page.getByRole("alertdialog", { name: "Leave this game?" })).toBeVisible();
+  await page.getByRole("button", { name: "Start a new game" }).click();
 
   await expect(page.getByRole("heading", { name: "Keep your eyes on the cards." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Who’s at the table?" })).toBeVisible();
@@ -106,6 +113,7 @@ test("configures Oh Hell, manual trumps, and simultaneous one-card bidding", asy
   await setUpTwoPlayers(page);
 
   await page.getByLabel("Rules preset").selectOption("oh-hell");
+  await openCustomRules(page);
   await expect(page.getByLabel("Starting cards")).toHaveValue("10");
   await expect(page.getByLabel("Ending cards")).toHaveValue("1");
   await expect(page.getByLabel("Scoring method")).toHaveValue("bid");
@@ -129,4 +137,20 @@ test("configures Oh Hell, manual trumps, and simultaneous one-card bidding", asy
 
   await expect(page.locator(".final-table li").filter({ hasText: "Ben" })).toContainText("11 pts");
   await expect(page.locator(".final-table li").filter({ hasText: "Ada" })).toContainText("10 pts");
+});
+
+test("updates result validation while tricks are edited", async ({ page }) => {
+  await setUpTwoPlayers(page);
+  await page.getByRole("button", { name: "Deal the first round" }).click();
+  await page.getByLabel("Ada bid").fill("2");
+  await page.getByLabel("Ben bid").fill("2");
+  await page.getByRole("button", { name: "Lock in bids" }).click();
+
+  const scoreButton = page.getByRole("button", { name: "Score this round" });
+  await expect(scoreButton).toBeDisabled();
+  await expect(page.getByText("3 tricks left to assign.")).toBeVisible();
+
+  await page.getByLabel("Ben tricks").fill("5");
+  await expect(page.getByText("All 7 tricks are assigned.")).toBeVisible();
+  await expect(scoreButton).toBeEnabled();
 });

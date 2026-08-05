@@ -23,4 +23,12 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Upload mobile UI review
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-ui-review
+          path: test-results/**/mobile-*.png
+          if-no-files-found: ignore
+          retention-days: 7
       - run: npm run build

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useOffline } from "@/components/offline-provider";
+import { OfflineLink, useOffline } from "@/components/offline-provider";
 import type { LeaderboardRow } from "@/db/queries";
 import {
   getLeaderboardSnapshot,
@@ -75,7 +75,7 @@ export function Leaderboard() {
   const { data } = view;
   if (data.error) return <div className="leaderboard-card empty-card"><strong>Leaderboard unavailable</strong><p>{data.error}</p></div>;
   if (!data.configured) return <div className="leaderboard-card empty-card"><strong>Database setup needed</strong><p>Add <code>DATABASE_URL</code> to start recording the rivalry.</p></div>;
-  if (!data.leaderboard.length) return <div className="leaderboard-card empty-card"><strong>No results yet</strong><p>Publish the first finished game to claim the top spot.</p></div>;
+  if (!data.leaderboard.length) return <div className="leaderboard-card empty-card"><strong>No results yet</strong><p>Publish the first finished game to claim the top spot.</p><OfflineLink className="empty-action" href="/">Score a game <span>→</span></OfflineLink></div>;
 
   return (
     <>
