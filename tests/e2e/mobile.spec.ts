@@ -18,6 +18,8 @@ async function setUpMobileGame(page: Page) {
 test("keeps setup concise and moves focus to the game", async ({ page }, testInfo) => {
   await setUpMobileGame(page);
   await expectNoHorizontalOverflow(page);
+  await expect(page.getByText("Flexible rules · 2–10 players · Elo ranked")).toBeVisible();
+  await expect(page.locator('input[type="range"]')).toHaveAttribute("max", "10");
   await expect(page.getByLabel("Rules preset")).toBeVisible();
   await expect(page.getByLabel("Scoring method")).toBeHidden();
   await expect(page.locator("summary").filter({ hasText: "Customise rules" })).toBeVisible();
@@ -34,6 +36,43 @@ test("keeps setup concise and moves focus to the game", async ({ page }, testInf
   const box = await increaseButton.boundingBox();
   expect(box?.height).toBeGreaterThanOrEqual(42);
   expect(box?.width).toBeGreaterThanOrEqual(42);
+});
+
+test("keeps ten-player entry and its action inside the game workspace", async ({ page }, testInfo) => {
+  await page.goto("/");
+  const playerCount = page.locator('input[type="range"]');
+  await playerCount.focus();
+  await playerCount.press("End");
+
+  await page.getByLabel("First dealer").fill("Player 1");
+  for (let player = 2; player <= 10; player += 1) {
+    await page.getByLabel(`Player ${player}`).fill(`Player ${player}`);
+  }
+  await page.getByRole("button", { name: "Deal the first round" }).click();
+
+  await expect(page.locator(".playing-game-shell")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Lock in bids" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Scores" })).toBeInViewport();
+  await expect(page.locator(".play-layout > .standings-card")).toBeHidden();
+  await expect.poll(() => page.evaluate(() => (
+    document.documentElement.scrollHeight <= window.innerHeight + 1
+  ))).toBe(true);
+
+  const playerList = page.locator(".stepper-list");
+  await expect(playerList).toBeInViewport();
+  const listMetrics = await playerList.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(listMetrics.clientHeight).toBeLessThanOrEqual(listMetrics.scrollHeight);
+
+  await page.getByRole("button", { name: "Scores" }).click();
+  const scoresDialog = page.getByRole("dialog", { name: "Scores" });
+  await expect(scoresDialog).toBeVisible();
+  await expect(scoresDialog.getByText("Live table")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("mobile-ten-player-scores.png"), fullPage: true });
+  await page.getByRole("button", { name: "Close scores" }).click();
+  await expect(page.getByRole("dialog", { name: "Scores" })).toHaveCount(0);
 });
 
 test("shows live validation and an in-app reset dialog", async ({ page }, testInfo) => {

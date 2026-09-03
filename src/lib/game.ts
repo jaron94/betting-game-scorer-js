@@ -1,6 +1,6 @@
 export const DECK_SIZE = 52;
 export const MAX_CARDS_PER_PLAYER = Math.floor(DECK_SIZE / 2);
-export const MAX_PLAYERS = DECK_SIZE;
+export const MAX_PLAYERS = 10;
 export const MIN_PLAYERS = 2;
 export const STARTING_RATING = 1000;
 export const TRUMP_SEQUENCE = ["spades", "hearts", "diamonds", "clubs", "none"] as const;

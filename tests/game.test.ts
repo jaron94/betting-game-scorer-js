@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CARD_SEQUENCE,
   DEFAULT_SCORING,
+  MAX_PLAYERS,
   chooseTrump,
   createGame,
   currentRound,
@@ -25,7 +26,15 @@ describe("legacy Betting Game rules", () => {
   it("reduces the number of cards and rounds for larger tables", () => {
     expect(roundSequenceFor(8)).toEqual([6, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6]);
     expect(roundSequenceFor(10)).toEqual([5, 4, 3, 2, 1, 2, 3, 4, 5]);
-    expect(roundSequenceFor(52)).toEqual([1]);
+    expect(MAX_PLAYERS).toBe(10);
+    expect(() => roundSequenceFor(11)).toThrow("Choose between 2 and 10 players");
+  });
+
+  it("limits a game to ten players", () => {
+    expect(createGame(Array.from({ length: 10 }, (_, index) => `Player ${index + 1}`)).players).toHaveLength(10);
+    expect(() => createGame(Array.from({ length: 11 }, (_, index) => `Player ${index + 1}`))).toThrow(
+      "Choose between 2 and 10 players",
+    );
   });
 
   it("supports independently configured starting and ending cards", () => {

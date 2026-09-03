@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   MAX_PLAYERS,
   MIN_PLAYERS,
@@ -79,7 +79,7 @@ export function Scorer() {
   return (
     <>
       {game ? null : <GameIntro />}
-      <section className={`scorer-shell${game ? " active-game-shell" : ""}`} aria-label="Game scorer">
+      <section className={`scorer-shell${game ? " active-game-shell" : ""}${game && game.stage !== "complete" ? " playing-game-shell" : ""}`} aria-label="Game scorer">
         {game ? <ActiveGame game={game} onChange={setGame} onStartOver={() => setResetRequested(true)} /> : <GameSetup onStart={setGame} />}
       </section>
       {game ? null : <RulesOverview />}
@@ -339,6 +339,7 @@ function ActiveGame({ game, onChange, onStartOver }: { game: GameState; onChange
     [game.players, game.rounds, game.settings.scoring],
   );
   const [error, setError] = useState("");
+  const [scoresOpen, setScoresOpen] = useState(false);
 
   if (game.stage === "complete") return <FinishedGame game={game} totals={totals} onStartOver={onStartOver} />;
   const round = currentRound(game);
@@ -361,7 +362,11 @@ function ActiveGame({ game, onChange, onStartOver }: { game: GameState; onChange
           <strong>{round.cards} {round.cards === 1 ? "card" : "cards"} · {suit ? <><i className={round.trump === "hearts" || round.trump === "diamonds" ? "red-suit" : ""}>{suit.symbol}</i> {suit.label}</> : "Choose trumps"}</strong>
           <small className="round-order">Dealer: {round.dealer.name} · {round.cards === 1 ? "Simultaneous bids" : `${round.bidOrder[0].name} bids first`} · {round.leadOrder[0].name} leads</small>
         </div>
-        <div className="toolbar-actions"><button className="text-button" onClick={undo}>↶ Undo</button><button className="text-button danger" onClick={onStartOver}>New game</button></div>
+        <div className="toolbar-actions">
+          <button className="text-button mobile-scores-button" aria-haspopup="dialog" onClick={() => setScoresOpen(true)}>Scores</button>
+          <button className="text-button" onClick={undo}>↶ Undo</button>
+          <button className="text-button danger" onClick={onStartOver}>New game</button>
+        </div>
       </div>
       <div className="progress-track"><span style={{ width: `${((game.roundIndex + (game.stage === "results" ? 0.5 : 0)) / cardSequence.length) * 100}%` }} /></div>
       <div className="play-layout">
@@ -369,7 +374,35 @@ function ActiveGame({ game, onChange, onStartOver }: { game: GameState; onChange
         <Standings players={game.players} totals={totals} roundsPlayed={game.rounds.length} dealerId={round.dealer.id} />
       </div>
       {game.rounds.length > 0 && <ScoreHistory game={game} />}
+      {scoresOpen ? (
+        <MobileScoresDialog onClose={() => setScoresOpen(false)}>
+          <Standings players={game.players} totals={totals} roundsPlayed={game.rounds.length} dealerId={round.dealer.id} />
+          {game.rounds.length > 0 ? <ScoreHistory game={game} /> : null}
+        </MobileScoresDialog>
+      ) : null}
     </>
+  );
+}
+
+function MobileScoresDialog({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+  return (
+    <div
+      className="mobile-scores-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") onClose();
+      }}
+    >
+      <section className="mobile-scores-sheet" role="dialog" aria-modal="true" aria-labelledby="mobile-scores-title">
+        <header className="mobile-scores-heading">
+          <div><span className="step-label">Current game</span><h2 id="mobile-scores-title">Scores</h2></div>
+          <button className="text-button" autoFocus onClick={onClose} aria-label="Close scores">Close</button>
+        </header>
+        {children}
+      </section>
+    </div>
   );
 }
 
