@@ -8,6 +8,7 @@ import {
   createGame,
   currentRound,
   maxCardsFor,
+  normaliseName,
   pointsFor,
   positionsFor,
   rollback,
@@ -25,6 +26,7 @@ import {
   type Trump,
 } from "@/lib/game";
 import type { SavedRating } from "@/db/save-game";
+import { PLAYER_MEMORY_KEY, parsePlayerMemory, rememberPlayers, type PlayerMemory } from "@/lib/player-memory";
 import {
   GAME_PUBLISHED_EVENT,
   useOffline,
@@ -43,6 +45,7 @@ export function Scorer() {
   const [game, setGame] = useState<GameState | null>(null);
   const [restored, setRestored] = useState(false);
   const [resetRequested, setResetRequested] = useState(false);
+  const [playerMemory, setPlayerMemory] = useState<PlayerMemory>({ names: [], lastTable: [] });
 
   useEffect(() => {
     let savedGame: GameState | null = null;
@@ -54,7 +57,13 @@ export function Scorer() {
     } catch {
       localStorage.removeItem(STORAGE_KEY);
     }
+    let remembered: PlayerMemory = { names: [], lastTable: [] };
+    try {
+      remembered = parsePlayerMemory(JSON.parse(localStorage.getItem(PLAYER_MEMORY_KEY) ?? "null"));
+    } catch { /* Name suggestions are optional when storage is unavailable. */ }
+    if (savedGame) remembered = rememberPlayers(remembered, savedGame.players.map(({ name }) => name));
     queueMicrotask(() => {
+      setPlayerMemory(remembered);
       if (savedGame) {
         setGame(savedGame);
         scrollPageToTop();
@@ -75,14 +84,24 @@ export function Scorer() {
     scrollPageToTop();
   }
 
+  function startGame(next: GameState) {
+    const remembered = rememberPlayers(playerMemory, next.players.map(({ name }) => name));
+    setPlayerMemory(remembered);
+    try { localStorage.setItem(PLAYER_MEMORY_KEY, JSON.stringify(remembered)); } catch { /* Do not block play. */ }
+    setGame(next);
+  }
+
+  function forgetPlayers() {
+    setPlayerMemory({ names: [], lastTable: [] });
+    try { localStorage.removeItem(PLAYER_MEMORY_KEY); } catch { /* Do not block setup. */ }
+  }
+
   if (!restored) return <section className="scorer-shell loading-card">Looking for a saved game…</section>;
   return (
     <>
-      {game ? null : <GameIntro />}
-      <section className={`scorer-shell${game ? " active-game-shell" : ""}${game && game.stage !== "complete" ? " playing-game-shell" : ""}`} aria-label="Game scorer">
-        {game ? <ActiveGame game={game} onChange={setGame} onStartOver={() => setResetRequested(true)} /> : <GameSetup onStart={setGame} />}
+      <section className={`scorer-shell${game ? " active-game-shell" : " setup-shell"}${game && game.stage !== "complete" ? " playing-game-shell" : ""}`} aria-label="Game scorer">
+        {game ? <ActiveGame game={game} onChange={setGame} onStartOver={() => setResetRequested(true)} /> : <GameSetup onStart={startGame} playerMemory={playerMemory} onForgetPlayers={forgetPlayers} />}
       </section>
-      {game ? null : <RulesOverview />}
       {resetRequested ? (
         <ResetGameDialog
           onCancel={() => setResetRequested(false)}
@@ -117,37 +136,30 @@ function ResetGameDialog({ onCancel, onConfirm }: { onCancel: () => void; onConf
   );
 }
 
-function GameIntro() {
-  return (
-    <section className="hero">
-      <div className="eyebrow">Flexible rules · {MIN_PLAYERS}–{MAX_PLAYERS} players · Elo ranked</div>
-      <h1>Keep your eyes on the cards.</h1>
-      <p>We’ll remember every bid, total every score, and settle the leaderboard when the last trick lands.</p>
-    </section>
-  );
-}
+const presetNames = { "betting-game": "Betting game", "oh-hell": "Oh Hell", "betting-alternative": "Betting game alternative" };
 
-function RulesOverview() {
-  return (
-    <section className="rules-strip" aria-label="Scoring rules">
-      <article><span>01</span><h2>Bid carefully</h2><p>Except in the simultaneous one-card round, total bids cannot equal the available tricks.</p></article>
-      <article><span>02</span><h2>Choose your rules</h2><p>Start with Betting Game, Oh Hell, or the alternative, then tailor every setting.</p></article>
-      <article><span>03</span><h2>Climb the table</h2><p>Final positions update a multiplayer Elo rating after each game.</p></article>
-    </section>
-  );
-}
-
-function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
+function GameSetup({ onStart, playerMemory, onForgetPlayers }: {
+  onStart: (game: GameState) => void;
+  playerMemory: PlayerMemory;
+  onForgetPlayers: () => void;
+}) {
   const [count, setCount] = useState(4);
   const [names, setNames] = useState(["", "", "", ""]);
   const [settings, setSettings] = useState<GameSettings>(() => settingsForPreset("betting-game", 4));
   const [error, setError] = useState("");
+  const [basePreset, setBasePreset] = useState<Exclude<GamePreset, "custom">>("betting-game");
+  const [rulesOpen, setRulesOpen] = useState(false);
   const cardSequence = roundSequenceFor(count, settings.startingCards, settings.endingCards);
+  const activeNames = names.slice(0, count);
+  const namesComplete = activeNames.every((name) => name.trim());
+  const namesUnique = new Set(activeNames.map(normaliseName)).size === count;
+  const canStart = namesComplete && namesUnique;
 
   function updateCount(next: number) {
+    next = Math.min(MAX_PLAYERS, Math.max(MIN_PLAYERS, Math.trunc(next) || MIN_PLAYERS));
     setError("");
     setCount(next);
-    setNames((current) => Array.from({ length: next }, (_, index) => current[index] ?? ""));
+    setNames((current) => Array.from({ length: Math.max(next, current.length) }, (_, index) => current[index] ?? ""));
     setSettings((current) => {
       if (current.preset !== "custom") return settingsForPreset(current.preset, next);
       const maximum = maxCardsFor(next);
@@ -161,54 +173,78 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
 
   function start() {
     try {
-      onStart(createGame(names, settings));
+      onStart(createGame(activeNames, settings));
       scrollPageToTop();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not start the game.");
+      setRulesOpen(true);
     }
   }
 
   function updateSettings(next: GameSettings) {
     setError("");
     setSettings(next);
+    if (next.preset === "custom") setRulesOpen(true);
   }
 
   function selectPreset(preset: GamePreset) {
-    if (preset !== "custom") updateSettings(settingsForPreset(preset, count));
+    if (preset !== "custom") {
+      setBasePreset(preset);
+      updateSettings(settingsForPreset(preset, count));
+      setRulesOpen(false);
+    }
   }
 
   return (
-    <div className="setup-grid">
+    <form className="setup-grid" noValidate onSubmit={(event) => { event.preventDefault(); if (canStart) start(); }}>
       <div className="setup-copy">
-        <div className="step-label">Game setup</div>
-        <h2>Who’s at the table?</h2>
+        <h1>Who’s at the table?</h1>
+        <p className="setup-strapline">Keep your eyes on the cards.</p>
         <p>Enter players in dealing order. The first name deals round one.</p>
-        <p>{cardSequence.length} {cardSequence.length === 1 ? "round" : "rounds"} · {scheduleLabel(settings.startingCards, settings.endingCards)}</p>
-        <label className="count-label">Number of players <strong>{count}</strong></label>
-        <input className="range" type="range" min={MIN_PLAYERS} max={MAX_PLAYERS} value={count} onChange={(event) => updateCount(Number(event.target.value))} />
-        <div className="range-labels"><span>{MIN_PLAYERS}</span><span>{MAX_PLAYERS}</span></div>
+        <div className="player-count-row">
+          <label htmlFor="player-count">Number of players<small>{MIN_PLAYERS}–{MAX_PLAYERS} players</small></label>
+          <div className="stepper player-count-control">
+            <button type="button" aria-label="Fewer players" disabled={count === MIN_PLAYERS} onClick={() => updateCount(count - 1)}>−</button>
+            <input id="player-count" type="number" inputMode="numeric" min={MIN_PLAYERS} max={MAX_PLAYERS} value={count} onChange={(event) => updateCount(Number(event.target.value))} />
+            <button type="button" aria-label="More players" disabled={count === MAX_PLAYERS} onClick={() => updateCount(count + 1)}>+</button>
+          </div>
+        </div>
+        {playerMemory.lastTable.length > 0 ? <button type="button" className="reuse-players" onClick={() => {
+          updateCount(playerMemory.lastTable.length);
+          setNames([...playerMemory.lastTable]);
+        }}>Use last players</button> : null}
+        <div className="setup-names">
+          {activeNames.map((name, index) => (
+            <label key={index}>
+              <span>{`Player ${index + 1}`}{index === 0 ? " · deals first" : ""}</span>
+              <input value={name} maxLength={40} autoComplete="off" list="remembered-players" placeholder="Name" onChange={(event) => {
+                setError("");
+                setNames((current) => current.map((value, i) => i === index ? event.target.value : value));
+              }} />
+            </label>
+          ))}
+        </div>
+        <datalist id="remembered-players">{playerMemory.names.map((name) => <option key={normaliseName(name)} value={name} />)}</datalist>
+        {playerMemory.names.length > 0 ? <div className="remembered-note"><small>Name suggestions stay on this device.</small><button type="button" onClick={onForgetPlayers}>Forget saved names</button></div> : null}
       </div>
-      <div className="player-form">
-        <label className="preset-picker first-player">
+      <div className="setup-rules">
+        <label className="preset-picker">
           <span>Rules preset</span>
           <select value={settings.preset} onChange={(event) => selectPreset(event.target.value as GamePreset)}>
             <option value="betting-game">Betting game</option>
             <option value="oh-hell">Oh Hell</option>
             <option value="betting-alternative">Betting game alternative</option>
-            {settings.preset === "custom" ? <option value="custom">Custom</option> : null}
+            {settings.preset === "custom" ? <option value="custom">{presetNames[basePreset]} (edited)</option> : null}
           </select>
-          <small>{scoringDescription(settings)}</small>
         </label>
-        {names.map((name, index) => (
-          <label className={index === 0 ? "first-player" : undefined} key={index}>
-            <span>{index === 0 ? "First dealer" : `Player ${index + 1}`}</span>
-            <input value={name} maxLength={40} autoComplete="off" placeholder={index === 0 ? "e.g. Jonathan" : "Name"} onChange={(event) => {
-              setError("");
-              setNames((current) => current.map((value, i) => i === index ? event.target.value : value));
-            }} />
-          </label>
-        ))}
-        <details className="rules-disclosure">
+        <div className="setup-rule-summary" aria-label="Selected rules">
+          <p><strong>{cardSequence.length} {cardSequence.length === 1 ? "round" : "rounds"} · {scheduleLabel(settings.startingCards, settings.endingCards)}</strong></p>
+          <p>{scoringDescription(settings)}</p>
+          <p>{settings.trumpMode === "cycle" ? "Trumps cycle ♠ → ♥ → ♦ → ♣ → no trumps." : "Choose trumps from a cut card each round."}</p>
+          <p>{settings.bidFirst === "dealer" ? "Dealer" : "Next player"} bids first; {settings.leadFirst === "dealer" ? "dealer" : "next player"} leads.</p>
+          <p>One-card round: simultaneous bids; {settings.allowExactBidOnOneCard ? "the total may equal one." : "the total cannot equal one."}</p>
+        </div>
+        <details className="rules-disclosure" open={rulesOpen} onToggle={(event) => setRulesOpen(event.currentTarget.open)}>
           <summary><span>Customise rules</span><small>{settings.preset === "custom" ? "Custom rules applied" : "Optional"}</small></summary>
           <GameSettingsEditor
             playerCount={count}
@@ -216,10 +252,18 @@ function GameSetup({ onStart }: { onStart: (game: GameState) => void }) {
             onChange={updateSettings}
           />
         </details>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        <button className="primary-button" onClick={start}>Deal the first round <span>→</span></button>
+        <details className="setup-help">
+          <summary>How scoring works</summary>
+          <p>Set up your players and house rules, then enter bids before each round and tricks afterwards. The app checks the totals and keeps the scores.</p>
+          <p>Your current game resumes automatically on this device. Once the offline app is ready, you can keep scoring without a connection. Publish the finished result to update the Elo leaderboard; offline results wait to sync.</p>
+        </details>
       </div>
-    </div>
+      <div className="setup-submit">
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <p id="setup-guidance" role="status">{!namesComplete ? "Add a name for every player." : !namesUnique ? "Use a different name for each player." : `${count} players · ${cardSequence.length} rounds · ready to deal`}</p>
+        <button className="primary-button" type="submit" disabled={!canStart} aria-describedby="setup-guidance">Deal the first round <span>→</span></button>
+      </div>
+    </form>
   );
 }
 
@@ -267,9 +311,9 @@ function GameSettingsEditor({
         <label className="wide-setting">
           <span>Scoring method</span>
           <select value={settings.scoring.mode} onChange={(event) => updateScoring({ mode: event.target.value as ScoringMode })}>
-            <option value="tricks">Tricks won + exact-bid bonus</option>
-            <option value="bid">Oh Hell — bid value + bonus when exact</option>
-            <option value="difference">Tricks minus bid + exact-bid bonus</option>
+            <option value="tricks">Tricks + exact-bid bonus</option>
+            <option value="bid">Oh Hell: bonus + bid when exact</option>
+            <option value="difference">Tricks − bid + exact bonus</option>
           </select>
         </label>
         <label>
@@ -285,15 +329,15 @@ function GameSettingsEditor({
             <span>When the bid is missed</span>
             <select value={settings.scoring.missedBidScoring} onChange={(event) => updateScoring({ missedBidScoring: event.target.value as GameSettings["scoring"]["missedBidScoring"] })}>
               <option value="zero">Score zero</option>
-              <option value="negative">Lose points for each trick away</option>
+              <option value="negative">Penalty per trick missed</option>
             </select>
           </label>
         ) : null}
         <label className="wide-setting">
           <span>Trumps</span>
           <select value={settings.trumpMode} onChange={(event) => customise({ trumpMode: event.target.value as GameSettings["trumpMode"] })}>
-            <option value="cycle">Cycle ♠, ♥, ♦, ♣, then no trumps</option>
-            <option value="manual">Choose each round (for a cut card)</option>
+            <option value="cycle">Suit cycle, then no trumps</option>
+            <option value="manual">Cut card each round</option>
           </select>
         </label>
         <label>

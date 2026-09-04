@@ -7,13 +7,11 @@ async function waitForOfflineShell(page: Page) {
 
 async function setUpOneRoundGame(page: Page) {
   await page.goto("/");
-  const playerCount = page.locator('input[type="range"]');
-  await playerCount.focus();
-  await playerCount.press("Home");
+  await page.getByRole("spinbutton", { name: "Number of players" }).fill("2");
   await page.getByText("Customise rules", { exact: true }).click();
   await page.getByLabel("Starting cards").selectOption("1");
   await page.getByLabel("Ending cards").selectOption("1");
-  await page.getByLabel("First dealer").fill("Ada");
+  await page.getByLabel("Player 1 · deals first").fill("Ada");
   await page.getByLabel("Player 2").fill("Ben");
   await page.getByRole("button", { name: "Deal the first round" }).click();
   await expect(page.getByRole("heading", { name: "Place the bids" })).toBeVisible();

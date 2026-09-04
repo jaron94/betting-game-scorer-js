@@ -8,18 +8,16 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 async function setUpMobileGame(page: Page) {
   await page.goto("/");
-  const playerCount = page.locator('input[type="range"]');
-  await playerCount.focus();
-  await playerCount.press("Home");
-  await page.getByLabel("First dealer").fill("Ada");
+  await page.getByRole("spinbutton", { name: "Number of players" }).fill("2");
+  await page.getByLabel("Player 1 · deals first").fill("Ada");
   await page.getByLabel("Player 2").fill("Ben");
 }
 
 test("keeps setup concise and moves focus to the game", async ({ page }, testInfo) => {
   await setUpMobileGame(page);
   await expectNoHorizontalOverflow(page);
-  await expect(page.getByText("Flexible rules · 2–10 players · Elo ranked")).toBeVisible();
-  await expect(page.locator('input[type="range"]')).toHaveAttribute("max", "10");
+  await expect(page.getByRole("heading", { name: "Who’s at the table?" })).toBeInViewport();
+  await expect(page.getByRole("spinbutton", { name: "Number of players" })).toHaveAttribute("max", "10");
   await expect(page.getByLabel("Rules preset")).toBeVisible();
   await expect(page.getByLabel("Scoring method")).toBeHidden();
   await expect(page.locator("summary").filter({ hasText: "Customise rules" })).toBeVisible();
@@ -40,11 +38,9 @@ test("keeps setup concise and moves focus to the game", async ({ page }, testInf
 
 test("keeps ten-player entry and its action inside the game workspace", async ({ page }, testInfo) => {
   await page.goto("/");
-  const playerCount = page.locator('input[type="range"]');
-  await playerCount.focus();
-  await playerCount.press("End");
+  await page.getByRole("spinbutton", { name: "Number of players" }).fill("10");
 
-  await page.getByLabel("First dealer").fill("Player 1");
+  await page.getByLabel("Player 1 · deals first").fill("Player 1");
   for (let player = 2; player <= 10; player += 1) {
     await page.getByLabel(`Player ${player}`).fill(`Player ${player}`);
   }
@@ -109,4 +105,30 @@ test("offers a scoring action from an empty leaderboard", async ({ page }, testI
   await expect(page.locator(".empty-action")).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await page.screenshot({ path: testInfo.outputPath("mobile-leaderboard.png"), fullPage: true });
+});
+
+test("keeps the ready setup action in view on a short phone", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 667 });
+  await page.goto("/");
+  const start = page.getByRole("button", { name: "Deal the first round" });
+  await expect(start).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "Who’s at the table?" })).toBeInViewport();
+  await page.getByLabel("Player 1 · deals first").fill("Ada");
+  for (let player = 2; player <= 4; player += 1) await page.getByLabel(`Player ${player}`).fill(`Name ${player}`);
+  await expect(start).toBeEnabled();
+  await page.getByText("Customise rules", { exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(start).toBeInViewport({ ratio: 1 });
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath("mobile-setup-ready.png"), fullPage: false });
+  const checkbox = page.getByRole("checkbox");
+  await expect(checkbox).toBeChecked();
+  await page.getByText("Allow total bids to equal one trick in the one-card forehead round", { exact: true }).click();
+  await expect(checkbox).not.toBeChecked();
+  const select = page.getByLabel("Scoring method");
+  expect(await select.evaluate((element) => parseFloat(getComputedStyle(element).paddingRight))).toBeGreaterThanOrEqual(38);
+  await expect(page.getByLabel("Points per trick")).toHaveAttribute("inputmode", "numeric");
+  const suits = page.locator(".suit-row");
+  await expect(suits.locator(".black-suit")).toHaveText(["♠", "♣"]);
+  await expect(suits.locator(".red-suit")).toHaveText(["♥", "♦"]);
 });

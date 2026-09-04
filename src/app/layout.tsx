@@ -43,7 +43,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           {children}
           <footer className="site-footer">
             <span>Contract Whist, minus the arithmetic.</span>
-            <span className="suit-row" aria-hidden="true">♠ <i>♥</i> ♦ <i>♣</i></span>
+            <span className="suit-row" aria-hidden="true"><span className="black-suit">♠</span> <span className="red-suit">♥</span> <span className="red-suit">♦</span> <span className="black-suit">♣</span></span>
           </footer>
         </OfflineProvider>
       </body>
