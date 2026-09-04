@@ -4,6 +4,9 @@ A mobile-first scorer for the Betting Game (Contract Whist), rebuilt from the or
 
 ## Features
 
+- Setup-first interface for 2–10 players, with a player-count stepper and sticky mobile start action
+- Always-visible house-rule summaries, with custom settings tucked behind a disclosure
+- On-device player-name suggestions and a shortcut to reuse the last table in dealing order
 - Configurable starting and ending cards, constrained by a 52-card deck
 - Betting Game, Oh Hell, and Betting Game Alternative presets with editable settings
 - Automatic suit/no-trumps cycling or manual trump choice from a cut card
@@ -36,6 +39,8 @@ The scorer works without a database, but completed games cannot be published and
 Open the deployed app once while online so its service worker can cache the scorer. It can then be installed from the browser and reopened without a connection. Active games remain in local storage, while completed results waiting to publish are kept separately in IndexedDB. Queued results are retried automatically when the connection returns while the app is open, or when the app is next launched online.
 
 If `SCORER_ACCESS_CODE` is configured, the code is never stored on the device. A queued result that needs authorisation remains safe in the outbox and the app prompts for the code after reconnection. The leaderboard shows its last downloaded snapshot offline and clearly labels when that snapshot was saved.
+
+Names from games started on this device are remembered locally for suggestions, along with the last table. They are not uploaded by setup. Use **Forget saved names** to clear these suggestions without removing a current game or any published leaderboard records. The active game still resumes automatically; reusing the last table is an explicit setup action.
 
 ## Rules and presets
 
